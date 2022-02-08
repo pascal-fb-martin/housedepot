@@ -148,7 +148,7 @@ static const char *housedepot_repository_page (const char *action,
             revision = "current";
         else if (!strcmp (revision, "all")) {
             echttp_content_type_json();
-            const char *data = housedepot_revision_history (filename);
+            const char *data = housedepot_revision_history (uri, filename);
             if (!data) {
                 echttp_error (404, "Not found");
                 return "";
@@ -176,6 +176,16 @@ static const char *housedepot_repository_page (const char *action,
             return "";
         }
         error = housedepot_revision_apply (tag, filename, revision);
+        if (error) echttp_error (500, error);
+        return "";
+    }
+
+    if (!strcmp (action, "DELETE")) {
+        if (!revision) {
+            echttp_error (403, "Revision to delete not specified");
+            return "";
+        }
+        error = housedepot_revision_delete (filename, revision);
         if (error) echttp_error (500, error);
         return "";
     }

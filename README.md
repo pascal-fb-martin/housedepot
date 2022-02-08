@@ -15,6 +15,8 @@ Its API implements a very specific behavior:
 
 - A standard GET request with no parameter always return the current version.
 
+- A standard PUT request with no parameter writes the content of a new revision. (For a client not aware of the revision history, this overwrites the file and appears as idempotent, which is why the PUT method is used for this operation.)
+
 The HouseDepot service is not meant to be accessed directly by end-users: this is a back office service that supports other services. Its web UI is intended for services administrators.
 
 A client service does not need to be concerned about versioning: it may just download the current configuration using the default URL.
@@ -78,7 +80,7 @@ A file history is a json object that contains the name of the server, a timestam
 Each tag definitions is an array with 2 entries: the tag name and the revision number.
 
 Each revision entry is an object with the following entries:
-- .date: an ASCII representation of the revision (POST) date and time
+- .date: an ASCII representation of the revision (PUT) date and time
 - .rev: the file's numeric revision number.
 
 The arrays have no specified order. The historical order of revisions can be reconstitued either by sorting on date or revision number.
@@ -100,6 +102,15 @@ Assign a tag to the specified revision. If the `tag` parameter is not specified.
 The definition of tag is the same as for the GET method except that using name `all` is not allowed.
 
 The file must exist.
+
+```
+DELETE /depot/<name>/...?revision=<tag>
+```
+Delete the specified tag or revision. If the revision parameter refers to a user defined tag, only the tag is removed. If the revision parameter refers to an actual revision number, this revision's file is deleted as well as all user-defined tags that refer to it.
+
+It is not allowed to delete a predefined tag, or a revision that a predefined tag refers to.
+
+It is planned to support revision=all, which would delete any occurrence of the file (all revisions and all tags) in one sweep. This is delayed until HouseDepot code base is considered stable.
 
 ## Configuration
 

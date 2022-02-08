@@ -15,5 +15,9 @@ const char *housedepot_revision_apply (const char *tag,
                                        const char *filename,
                                        const char *revision);
 
-const char *housedepot_revision_history (const char *filename);
+const char *housedepot_revision_delete (const char *filename,
+                                        const char *revision);
+
+const char *housedepot_revision_history (const char *uri,
+                                         const char *filename);
 

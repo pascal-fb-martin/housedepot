@@ -53,6 +53,13 @@
  *   The tag is moved if it was already assigned to another revision.
  *   The tag is created if it did not exist yet.
  *
+ * const char *housedepot_revision_delete (const char *filename,
+ *                                         const char *revision);
+ *
+ *   Delete a specific revision of a file. This automatically delete all the
+ *   user defined tags. One cannot delete a revision referenced by either
+ *   predefined tag.
+ *
  * const char *housedepot_revision_history (const char *filename);
  *
  *   Return JSON data that describe the file history.
@@ -128,8 +135,12 @@ int housedepot_revision_checkout (const char *filename,
     if (!housedepot_revision_isvalid(revision)) return -1;
 
     snprintf (fullname, sizeof(fullname), "%s%c%s", filename, FRM, revision);
-printf ("Checkout %s\n", fullname);
     return open (fullname, O_RDONLY);
+}
+
+static int housedepot_revision_link (const char *target, const char *link) {
+    unlink (link);
+    return symlink(target, link);
 }
 
 const char *housedepot_revision_checkin (const char *filename,
@@ -167,18 +178,15 @@ const char *housedepot_revision_checkin (const char *filename,
     // Set the standard tags as symbolic links: ~latest and ~current.
     //
     housedepot_trace (HOUSE_INFO, filename, "UPDATE", "latest", fullname);
-    unlink (link);
-    if (symlink(fullname, link))
+    if (housedepot_revision_link (fullname, link))
         return "Cannot create link for the latest tag";
 
     housedepot_trace (HOUSE_INFO, filename, "UPDATE", "current", fullname);
     snprintf (link, sizeof(link), "%s%c%s", filename, FRM, "current");
-    unlink (link);
-    if (symlink(fullname, link))
+    if (housedepot_revision_link (fullname, link))
         return "Cannot create link for the current tag";
 
-    unlink (filename);
-    if (symlink(fullname, filename))
+    if (housedepot_revision_link (fullname, filename))
         return "Cannot create link for default file";
 
     return 0;
@@ -227,12 +235,11 @@ const char *housedepot_revision_apply (const char *tag,
 
     housedepot_trace (HOUSE_INFO, filename, "APPLY", tag, fullname);
     snprintf (link, sizeof(link), "%s%c%s", filename, FRM, tag);
-    unlink (link);
-    if (symlink(fullname, link)) return "Cannot create the tag link";
+    if (housedepot_revision_link (fullname, link))
+        return "Cannot create the tag link";
 
     if (!strcmp (tag, "current")) {
-        unlink (filename);
-        if (symlink(fullname, filename))
+        if (housedepot_revision_link (fullname, filename))
             return "Cannot create link for default file";
     }
 
@@ -243,7 +250,6 @@ static char *scandir_pattern = 0;
 static int scandir_pattern_length = 0;
 
 static int housedepot_revision_filter (const struct dirent *e) {
-printf ("Scandir before filter: %s\n", e->d_name);
     if (strncmp (e->d_name, scandir_pattern, scandir_pattern_length)) return 0;
     return 1;
 }
@@ -263,7 +269,7 @@ static int housedepot_revision_compare (const struct dirent **a,
         int reva = atoi(aname);
         int revb = atoi(bname);
         if (reva < revb) return -1;
-        if (reva > revb) return 0; // Should never happen
+        if (reva > revb) return 1;
         return 0; // Should never happen (two file with the same name?)
     }
 
@@ -271,7 +277,87 @@ static int housedepot_revision_compare (const struct dirent **a,
     return alphasort(a, b);
 }
 
-const char *housedepot_revision_history (const char *filename) {
+const char *housedepot_revision_delete (const char *filename,
+                                        const char *revision) {
+
+    char fullname[1024];
+    char working[1024];
+
+    if (!revision) return "revision is required";
+    snprintf (fullname, sizeof(fullname), "%s%c%s", filename, FRM, revision);
+
+    if (!isdigit(revision[0])) {
+        // This operation is about deleting a tag.
+        if (!strcmp(revision, "current")) return "Cannot delete current";
+        if (!strcmp(revision, "latest")) return "Cannot delete latest";
+        unlink (fullname);
+        return 0;
+    }
+
+    // Now the revision is a real revision, not a tag.
+    // Protect the latest and current revisions against deletion.
+    //
+    if (! housedepot_revision_resolve (filename, "current",
+                                       working, sizeof(working)))
+        return "broken current tag";
+    if (!strcmp (fullname, working)) return "cannot delete current";
+
+    if (! housedepot_revision_resolve (filename, "latest",
+                                       working, sizeof(working)))
+        return "broken latest tag";
+    if (!strcmp (fullname, working)) return "cannot delete latest";
+
+    // So this revision is neither the latest or the current revision.
+    // Now we must retrieve all tags that refer to this, and delete
+    // them first.
+    // Retrieve both the directory to scan and the file pattern to search.
+    //
+    struct dirent **files;
+
+    snprintf (working, sizeof(working), "%s%c", filename, FRM);
+    scandir_pattern = strrchr (working, '/');
+    if (!scandir_pattern) return 0;
+    *(scandir_pattern++) = 0;
+    scandir_pattern_length = strlen(scandir_pattern);
+
+    int n = scandir (working, &files, housedepot_revision_filter,
+                                      housedepot_revision_compare);
+    scandir_pattern = 0;
+
+    int i;
+    for (i = 0; i < n; i++) {
+        if (files[i]->d_type == DT_LNK) {
+            char link[1024];
+            char target[1024];
+            snprintf (link, sizeof(link), "%s/%s", working, files[i]->d_name);
+            int pathsz = readlink (link, target, sizeof(target)-1);
+            if (pathsz <= 0) continue;
+            target[pathsz] = 0;
+            char *targetsep = strrchr (target, FRM);
+            if (targetsep) {
+                if (!strcmp (targetsep+1, revision)) {
+                    unlink(link);
+                    housedepot_trace
+                        (HOUSE_INFO, filename, "DELETE", files[i]->d_name, 0);
+                }
+            }
+        }
+    }
+    for (i = 0; i < n; i++) {
+        free (files[i]);
+    }
+    free (files);
+
+    // Now that all tag pointing to this revision were removed, we can delete
+    // the revision file itself.
+    //
+    unlink(fullname);
+    housedepot_trace (HOUSE_INFO, filename, "DELETE", fullname, 0);
+    return 0;
+}
+
+const char *housedepot_revision_history (const char *uri,
+                                         const char *filename) {
 
     static char buffer[16000];
 
@@ -286,25 +372,20 @@ const char *housedepot_revision_history (const char *filename) {
     if (!scandir_pattern) return 0;
     *(scandir_pattern++) = 0;
     scandir_pattern_length = strlen(scandir_pattern);
-printf ("Scandir pattern: %s\n", scandir_pattern);
 
     int n = scandir (dirname, &files, housedepot_revision_filter,
                                       housedepot_revision_compare);
-printf ("Scandir: %d items\n", n);
     scandir_pattern = 0;
 
     if (n <= 0) return 0;
 
-    const char *portal = housedepot_revision_portal;
-    int cursor;
-    if (portal)
-        cursor = snprintf (buffer, sizeof(buffer),
-                           "{\"host\":\"%s\",\"proxy\":\"%s\",\"timestamp\":%d,\"tags\":[",
-                           housedepot_revision_host, portal, (int)time(0));
-    else
-        cursor = snprintf (buffer, sizeof(buffer),
-                           "{\"host\":\"%s\",\"timestamp\":%d,\"tags\":[",
-                           housedepot_revision_host, (int)time(0));
+    int cursor = snprintf (buffer, sizeof(buffer),
+                           "{\"host\":\"%s\",\"timestamp\":%d,\"file\":\"%s\"",
+                           housedepot_revision_host, (int)time(0), uri);
+    if (housedepot_revision_portal)
+        cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor,
+                           ",\"proxy\":\"%s\"", housedepot_revision_portal);
+    cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor, ",\"tags\":[");
 
     const char *sep = "";
     int tags = 1;
@@ -312,7 +393,6 @@ printf ("Scandir: %d items\n", n);
     for (i = 0; i < n; i++) {
         struct dirent *ent = files[i];
 
-printf ("Scandir result: %s\n", ent->d_name);
         switch (ent->d_type) {
         case DT_LNK:
             if (tags) {
@@ -320,7 +400,7 @@ printf ("Scandir result: %s\n", ent->d_name);
                 char fullname[1024];
                 if (tagname &&
                     housedepot_revision_resolve (filename, tagname+1,
-                                           fullname, sizeof(fullname))) {
+                                                 fullname, sizeof(fullname))) {
                     const char *rev = strrchr (fullname, FRM);
                     if (rev) {
                         cursor +=
@@ -332,7 +412,6 @@ printf ("Scandir result: %s\n", ent->d_name);
             }
             break;
         case DT_REG:
-printf ("Regular file (tags=%d): %s\n", tags, ent->d_name);
             if (tags) {
                 cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor,
                                     "],\"history\":[");
@@ -340,7 +419,6 @@ printf ("Regular file (tags=%d): %s\n", tags, ent->d_name);
                 tags = 0; // No more link representing tags.
             }
             const char *ver = strrchr(ent->d_name, FRM);
-printf ("ver = %s\n", ver);
             if (ver) {
                 char fullname[1024];
                 struct stat filestat;
@@ -356,7 +434,6 @@ printf ("ver = %s\n", ver);
             }
             break;
         default:
-printf ("unknown file type %d: %s\n", ent->d_type, ent->d_name);
         }
     }
     snprintf (buffer+cursor, sizeof(buffer)-cursor, "]}");
