@@ -1,33 +1,33 @@
 # HouseDepot
 A House web service to maintain configurations, scripts and other resource files.
 ## Overview
-This is a web server application that stores files for other services.
+This is a web server application that stores files for other services, so that services can access their configuration independently of the computer they currently run on.
 
-The goal is to provide a simple Web API (GET, PUT and POST methods), with no extensions beside a few optional parameters, that implements a specified behavior based on URL matching (see below for a description of the web API).
+That application also provides a central point through which all configuration files can be accessed and updated, facilitating the deployement of configurations when there is a fair number of computers involved (e.g. five or six Raspberry Pi computers).
 
-Its API implements a very specific behavior:
+On the client application side, the goal is to provide a simple Web API (GET, PUT and POST methods), with no extensions beside a few optional parameters, that implements a specified behavior based on URL matching (see below for a description of the web API).
+
+The web API implements a very specific behavior:
 
 - An history of all updates is maintained by versioning every file. Each file is versioned independently from each other.
 
-- Any update to a revision controled file becomes the latest and current version, available to download through HTTP.
-
-- A web API allows changing the current version or applying user defined tags.
-
-- A standard GET request with no parameter always return the current version.
+- Any update to a revision controled file becomes the latest and current version, available to download through standard HTTP GET with no parameter required.
 
 - A standard PUT request with no parameter writes the content of a new revision. (For a client not aware of the revision history, this overwrites the file and appears as idempotent, which is why the PUT method is used for this operation.)
 
-The HouseDepot service is not meant to be accessed directly by end-users: this is a back office service that supports other services. Its web UI is intended for services administrators.
+- A web API allows administrator to change the current version or to apply user defined tags (tags are mostly intended for documentation purposes).
 
-A client service does not need to be concerned about versioning: it may just download the current configuration using the default URL.
+A client service does not need to be concerned about versioning: it may just download the current configuration using the default URL, as if HouseDepot was a standard web server providing static content.
+
+Upload to HouseDepot is also a standard PUT request, compatible with most available web tools (e.g. wget or curl).
 
 Note that HouseDepot is not intended to be used as a source configuration system: this is intended for a production system where one may need to revert a configuration change or to review when and what changes occurred.
 
 There is no commit comment: instead one may assign tags to revisions (including multiple tags to the same revision).
 
-It is the intent of the design to allow multipe HouseDepot services to run concurrently, for redundancy. The clients are responsible for sending updates to all active HouseDepot services: there is no synchronization between HouseDepot services.
+It is the intent of the design to allow multipe HouseDepot services to run concurrently, for redundancy. The clients are responsible for sending updates to all active HouseDepot services: there is no synchronization between the HouseDepot services themselves.
 
-Access to HouseDepot is not restricted: this service should only be accessible from a private network, and the data should not be sensitive. Do not store cryptographic keys using HouseDepot.
+Access to HouseDepot is not restricted: this service should only be accessible from a private network, and the data should not be sensitive. *Do not store cryptographic keys or other secrets using HouseDepot.*
 
 ## Installation
 
@@ -60,7 +60,21 @@ housedepot -repo=userx:/var/lib/user/x -repo=userz:/var/lib/user/z
 ```
 The housedepot service launched in the example above will accept revision controled files at /depot/userx and /depot/userz in addition to the default repositories.
 
-The path of each file relative to its root directory matches the path used in the HTTP URL. For example `/depot/config/cabin/sprinkler.json` matches file `/var/lib/house/config/cabin/sprinkler.json`.
+The path of each file relative to its root directory matches the path used in the HTTP URL. For example `/depot/config/cabin/sprinkler.json` matches file `/var/lib/house/config/cabin/sprinkler.json`. However HouseDepot limits the depth to one subdirectory level only: attempts to create /depot/config/cabin/woods/sprinkler.json would be rejected.
+
+## Recommanded Practices
+
+One of HouseDepot's goals is to facilitate moving services across a pool of computers and avoid leaving multiple (out of date) copies of their configuration lingering around.
+
+A way to do this is to either have a single configuration file name across the network (for example if there is only one sprinkler controller active at any one time).
+
+Sometimes multiple separate configurations are necessary. In that case, one can define a configuration name (named group) that is distinct from the set of computer names. When the service is moved from one computer to the other, the only local configuration needed is to choose the proper group name. (This is named a group because it is expected that a complete system configuration will include multiple services working in concert, i.e. a group of services. A local network might run multiple instances of such groups.)
+
+However some services (e.g. HouseRelays or HouseSensor) depend on access to local hardware interfaces that are not present on other computers: in that case the recommended practice is to name the configuration based on the computer name.
+
+In order to keep the purpose of each configuration file clear, it is recommended for the configuration path to retain the ID of the service it is related to. A configuration file name would then incorporate two parts: a group or computer name and a service name.
+
+The allowance for one level of directory is intended to support this recommended organization: use the group or computer name as a subdirectory name, and keep the configuration file's base name matching the service ID.
 
 ## Web API
 

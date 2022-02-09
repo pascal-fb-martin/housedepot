@@ -34,6 +34,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include "echttp.h"
 #include "echttp_static.h"
@@ -161,6 +162,17 @@ static const char *housedepot_repository_page (const char *action,
     }
 
     if (!strcmp (action, "PUT")) {
+        snprintf (rooturi, sizeof(rooturi), "%s", filename);
+        char *subdir = strrchr (rooturi, '/');
+        if (subdir) {
+            *subdir = 0;
+            if (mkdir (rooturi, 0700) < 0) {
+                if (errno != EEXIST) {
+                    echttp_error (500, "URI too deep");
+                    return "";
+                }
+            }
+        }
         error = housedepot_revision_checkin (filename, data, length);
         if (error) echttp_error (500, error);
         return "";
