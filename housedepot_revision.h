@@ -21,6 +21,9 @@ const char *housedepot_revision_delete (const char *clientname,
                                         const char *filename,
                                         const char *revision);
 
+const char *housedepot_revision_list (const char *clientname,
+                                      const char *dirname);
+
 const char *housedepot_revision_history (const char *clientname,
                                          const char *filename);
 

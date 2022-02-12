@@ -22,6 +22,11 @@
  * housedepot_repository.c: a module to manage web resources (files) and maintain
  * their change history.
  *
+ * void housedepot_repository_initialize (const char *hostname,
+ *                                        const char *portal);
+ *
+ *    Set the host and portal names and initialize the module's resources.
+ *
  * void housedepot_repository_route (const char *uri, const char *path);
  *
  *    Initialize the module and its web API.
@@ -46,6 +51,9 @@
 static echttp_catalog housedepot_repository_roots;
 
 static echttp_catalog housedepot_repository_type;
+
+static const char *housedepot_repository_host;
+static const char *housedepot_repository_portal;
 
 /* List the supported content types.
  * Only list text-based format here: RCS does not handle binary data.
@@ -145,6 +153,10 @@ static const char *housedepot_repository_page (const char *action,
     const char *revision = echttp_parameter_get ("revision");
 
     if (!strcmp (action, "GET")) {
+        if (!strcmp (uri+strlen(rooturi), "/all")) {
+            echttp_content_type_json();
+            return housedepot_revision_list (uri, path);
+        }
         if (!revision)
             revision = "current";
         else if (!strcmp (revision, "all")) {
@@ -207,7 +219,50 @@ static const char *housedepot_repository_page (const char *action,
     return "";
 }
 
-static void housedepot_repository_initialize (void) {
+static char housedepot_repositories[1024];
+static int housedepot_repositories_cursor;
+static char *housedepot_repositories_sep;
+
+static int housedepot_repository_list_iterator (const char *name,
+                                                const char *value) {
+
+    housedepot_repositories_cursor +=
+        snprintf (housedepot_repositories+housedepot_repositories_cursor,
+                  sizeof(housedepot_repositories)-housedepot_repositories_cursor,
+                  "%s\"%s\"", housedepot_repositories_sep, name);
+
+    housedepot_repositories_sep = ",";
+    return 0;
+}
+
+static const char *housedepot_repository_list (const char *action,
+                                               const char *uri,
+                                               const char *data, int length) {
+
+    char *buffer = housedepot_repositories;
+    const int size = sizeof(housedepot_repositories);
+
+    int cursor = snprintf (buffer, size,
+                           "{\"host\":\"%s\",\"timestamp\":%d",
+                           housedepot_repository_host, (int)time(0));
+    if (housedepot_repository_portal)
+        cursor += snprintf (buffer+cursor, size-cursor,
+                           ",\"proxy\":\"%s\"", housedepot_repository_portal);
+    cursor += snprintf (buffer+cursor, size-cursor, ",\"repositories\":[");
+
+    housedepot_repositories_cursor = cursor;
+    housedepot_repositories_sep = "";
+    echttp_catalog_enumerate (&housedepot_repository_roots,
+                              housedepot_repository_list_iterator);
+
+    cursor = housedepot_repositories_cursor;
+    snprintf (buffer+cursor, sizeof(buffer)-cursor, "]}");
+    echttp_content_type_json();
+    return buffer;
+}
+
+void housedepot_repository_initialize (const char *hostname,
+                                       const char *portal) {
 
     static int Initialized = 0;
     if (!Initialized) {
@@ -218,13 +273,15 @@ static void housedepot_repository_initialize (void) {
                                 housedepot_repository_supported[i].extension,
                                 housedepot_repository_supported[i].content);
         }
+        housedepot_repository_host = hostname;
+        housedepot_repository_portal = portal;
+        echttp_route_uri ("/depot/all", housedepot_repository_list);
         Initialized = 1;
     }
 }
 
 int housedepot_repository_route (const char *uri, const char *path) {
 
-    housedepot_repository_initialize();
     echttp_catalog_set (&housedepot_repository_roots, uri, path);
     return echttp_route_match (uri, housedepot_repository_page);
 }

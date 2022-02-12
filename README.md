@@ -60,6 +60,8 @@ housedepot -repo=userx:/var/lib/user/x -repo=userz:/var/lib/user/z
 ```
 The housedepot service launched in the example above will accept revision controled files at /depot/userx and /depot/userz in addition to the default repositories.
 
+No file or repository can be named "all". Character '~' is not allowed in file, repository or subdirectory names. Only alphabetical, numerical, '_' and '-' characters are allowed in tag names.
+
 The path of each file relative to its root directory matches the path used in the HTTP URL. For example `/depot/config/cabin/sprinkler.json` matches file `/var/lib/house/config/cabin/sprinkler.json`. However HouseDepot limits the depth to one subdirectory level only: attempts to create /depot/config/cabin/woods/sprinkler.json would be rejected.
 
 ## Recommanded Practices
@@ -78,6 +80,14 @@ The allowance for one level of directory is intended to support this recommended
 
 ## Web API
 
+```
+GET /depot/all
+```
+Return the list of all repositories present on this HouseDepot service.
+```
+GET /depot/<name>/all
+```
+Return the list of all files present in the specified repository, with their current revision and date (i.e. the revision and file for the current version).
 ```
 GET /depot/<name>/...
 GET /depot/<name>/...?revision=<tag>

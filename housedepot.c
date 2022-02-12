@@ -97,6 +97,7 @@ int main (int argc, const char **argv) {
     echttp_protect (0, housedepot_protect);
 
     housedepot_revision_initialize (houselog_host(), houseportal_server());
+    housedepot_repository_initialize (houselog_host(), houseportal_server());
 
     housedepot_repository_route ("/depot/config", "/var/lib/house/config");
     housedepot_repository_route ("/depot/scripts", "/var/lib/house/scripts");

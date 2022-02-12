@@ -21,12 +21,15 @@
  *
  * housedepot_revision.c - A module that handles file revisions.
  *
+ * DESCRIPTION
+ *
  * This module implements a very simplistic source revision system: linear
  * revisions (no branches) and user defined symbolic tags. Each revision is
  * saved as a separate file with the suffix '~'+revision appended to its name.
- * Tags are implemented as symbolic links.
+ * Tags are implemented as symbolic links, with the suffix '~'+tag appended
+ * to its name.
  *
- * There are three predefined tags: ~current, ~latest and ~all.
+ * There are three predefined tags: current, latest and all.
  *
  * To facilitate web access, a symbolic link without suffix always points
  * to the same revision as "~current". (That link is not used here.)
@@ -40,9 +43,13 @@
  *   filename:   the path that is used for local storage. This is the name
  *               used for all file operations.
  *
+ *   dirname:    the repository root path, as used for local storage.
+ *
+ * SYNOPSYS
+ *
  * void housedepot_revision_initialize (const char *host, const char *portal);
  *
- *   Provide the context to report when formatting responses.
+ *   Provides the context to report when formatting responses.
  *
  * int housedepot_revision_checkout (const char *filename,
  *                                   const char *revision);
@@ -68,14 +75,20 @@
  *                                         const char *filename,
  *                                         const char *revision);
  *
- *   Delete a specific revision of a file. This automatically delete all the
- *   user defined tags. One cannot delete a revision referenced by either
- *   predefined tag.
+ *   Delete a specific revision of a file. This automatically deletes all the
+ *   user defined tags that link to that revision. This fails and nothing is
+ *   deleted if the revision is referenced by a predefined tag.
+ *
+ * const char *housedepot_revision_list (const char *clientname,
+ *                                       const char *dirname);
+ *
+ *   Return JSON data that lists all the files stored in the repository
+ *   identified by its root path.
  *
  * const char *housedepot_revision_history (const char *clientname,
  *                                          const char *filename);
  *
- *   Return JSON data that describe the file history.
+ *   Return JSON data that describes the file history.
  */
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -163,6 +176,12 @@ const char *housedepot_revision_checkin (const char *clientname,
     int newrev;
     char fullname[1024];
     char link[1024];
+
+    const char *basename = strrchr(filename, '/');
+    if (!basename) return "invalid file path";
+    if (!strcmp(basename, "/all")) return "invalid file name";
+
+    if (strchr(filename, FRM)) return "invalid character in name";
 
     // Retrieve which revision number to use for this new file revision.
     // (Increment latest.)
@@ -274,12 +293,20 @@ static char *scandir_pattern = 0;
 static int scandir_pattern_length = 0;
 
 static int housedepot_revision_filter (const struct dirent *e) {
+    if (!scandir_pattern) return 1; // Should never happen, avoid crash.
     if (strncmp (e->d_name, scandir_pattern, scandir_pattern_length)) return 0;
     return 1;
 }
 
 static int housedepot_revision_compare (const struct dirent **a,
                                         const struct dirent **b) {
+
+    if ((*a)->d_type == DT_DIR) {
+        if ((*b)->d_type != DT_DIR) return 1; // Subdirectories last.
+        return 0;
+    }
+    if ((*b)->d_type == DT_DIR) return -1; // Subdirectories last.
+
     const char *aname = strrchr((*a)->d_name, FRM);
     const char *bname = strrchr((*b)->d_name, FRM);
 
@@ -299,6 +326,14 @@ static int housedepot_revision_compare (const struct dirent **a,
 
     if (isdigit(bname[0])) return -1; // Tags before revision (a < b).
     return alphasort(a, b);
+}
+
+static void housedepot_revision_cleanscan (struct dirent **files, int n) {
+    int i;
+    for (i = 0; i < n; i++) {
+        free (files[i]);
+    }
+    free (files);
 }
 
 const char *housedepot_revision_delete (const char *clientname,
@@ -372,10 +407,7 @@ const char *housedepot_revision_delete (const char *clientname,
             }
         }
     }
-    for (i = 0; i < n; i++) {
-        free (files[i]);
-    }
-    free (files);
+    housedepot_revision_cleanscan (files, n);
 
     // Now that all tag pointing to this revision were removed, we can delete
     // the revision file itself.
@@ -388,6 +420,95 @@ const char *housedepot_revision_delete (const char *clientname,
     houselog_event ("FILE", clientname, "DELETED", "REVISION %s", realrev+1);
 
     return 0;
+}
+
+const char *housedepot_revision_list (const char *clientname,
+                                      const char *dirname) {
+
+    static char buffer[16000];
+
+    int i;
+    struct dirent **files;
+
+    int n = scandir (dirname, &files, 0, housedepot_revision_compare);
+    if (n <= 0) return 0;
+
+    int cursor = snprintf (buffer, sizeof(buffer),
+                           "{\"host\":\"%s\",\"timestamp\":%d",
+                           housedepot_revision_host, (int)time(0));
+    if (housedepot_revision_portal)
+        cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor,
+                           ",\"proxy\":\"%s\"", housedepot_revision_portal);
+    cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor, ",\"files\":[");
+
+    const char *sep = "";
+    int tags = 1;
+
+    for (i = 0; i < n; i++) {
+        struct dirent *ent = files[i];
+        if (ent->d_name[0] == '.') continue; // Skip hidden files, . and ..
+
+        switch (ent->d_type) {
+        case DT_DIR:
+            // Support only one level of subdirectory (see README.md)
+            int i2;
+            struct dirent **files2;
+            static char subdir[1024];
+            snprintf (subdir, sizeof(subdir), "%s/%s", dirname, ent->d_name);
+            int n2 = scandir (subdir, &files2, 0, housedepot_revision_compare);
+            if (n2 <= 0) break;
+
+            for (i2 = 0; i2 < n2; i2++) {
+                struct dirent *ent2 = files2[i2];
+                if (ent2->d_type != DT_LNK) continue; // One directory level.
+                if (strchr(ent2->d_name, FRM)) continue; // Skip tag links.
+                char link[1024];
+                char target[1024];
+                snprintf (link, sizeof(link), "%s/%s/%s",
+                          dirname, ent->d_name, ent2->d_name);
+                int pathsz = readlink (link, target, sizeof(target)-1);
+                if (pathsz <= 0) continue;
+                target[pathsz] = 0;
+                char *rev = strrchr(target, FRM);
+                if (!rev) continue;
+                struct stat fs;
+                if (stat (target, &fs) != 0) continue;
+                cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor,
+                                    "%s{\"name\":\"%s/%s\",\"rev\":\"%s\",\"time\":%d}",
+                                    sep, ent->d_name, ent2->d_name, rev+1, (int)(fs.st_mtime));
+
+                sep = ",";
+            }
+            housedepot_revision_cleanscan (files2, n2);
+            break;
+
+        case DT_LNK:
+            if (strchr(ent->d_name, FRM)) break; // Skip tag links.
+            char link[1024];
+            char target[1024];
+            snprintf (link, sizeof(link), "%s/%s", dirname, ent->d_name);
+            int pathsz = readlink (link, target, sizeof(target)-1);
+            if (pathsz <= 0) break;
+            target[pathsz] = 0;
+            char *rev = strrchr(target, FRM);
+            if (!rev) break;
+            struct stat fs;
+            if (stat (target, &fs) != 0) break;
+            cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor,
+                                "%s{\"name\":\"%s\",\"rev\":\"%s\",\"time\":%d}",
+                                sep, ent->d_name, rev+1, (int)(fs.st_mtime));
+            sep = ",";
+            break;
+
+        default:
+            // Ignore actual files: we are not asking for all revisions.
+            break;
+        }
+    }
+    snprintf (buffer+cursor, sizeof(buffer)-cursor, "]}");
+    housedepot_revision_cleanscan (files, n);
+
+    return buffer;
 }
 
 const char *housedepot_revision_history (const char *clientname,
@@ -472,11 +593,7 @@ const char *housedepot_revision_history (const char *clientname,
     }
     snprintf (buffer+cursor, sizeof(buffer)-cursor, "]}");
 
-    for (i = 0; i < n; i++) {
-        free (files[i]);
-    }
-    free (files);
-
+    housedepot_revision_cleanscan (files, n);
     return buffer;
 }
 
