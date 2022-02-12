@@ -8,16 +8,19 @@ void housedepot_revision_initialize (const char *host, const char *portal);
 int housedepot_revision_checkout (const char *filename,
                                   const char *revision);
 
-const char *housedepot_revision_checkin (const char *filename,
+const char *housedepot_revision_checkin (const char *clientname,
+                                         const char *filename,
                                          const char *data, int length);
 
 const char *housedepot_revision_apply (const char *tag,
+                                       const char *clientname,
                                        const char *filename,
                                        const char *revision);
 
-const char *housedepot_revision_delete (const char *filename,
+const char *housedepot_revision_delete (const char *clientname,
+                                        const char *filename,
                                         const char *revision);
 
-const char *housedepot_revision_history (const char *uri,
+const char *housedepot_revision_history (const char *clientname,
                                          const char *filename);
 

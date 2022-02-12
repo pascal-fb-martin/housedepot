@@ -31,6 +31,15 @@
  * To facilitate web access, a symbolic link without suffix always points
  * to the same revision as "~current". (That link is not used here.)
  *
+ * The same naming convention is used for all the methods listed below:
+ *
+ *   clientname: the path as seens by the external client. It is provided
+ *               for generating traces, events or fill responses sent
+ *               back to the client.
+ *
+ *   filename:   the path that is used for local storage. This is the name
+ *               used for all file operations.
+ *
  * void housedepot_revision_initialize (const char *host, const char *portal);
  *
  *   Provide the context to report when formatting responses.
@@ -40,12 +49,14 @@
  *
  *   Checkout the specified revision and make this revision the "current" one.
  *
- * const char *housedepot_revision_checkin (const char *filename,
+ * const char *housedepot_revision_checkin (const char *clientname,
+ *                                          const char *filename,
  *                                          const char *data, int length);
  *
  *   Checkin the provided data as the new current content of the specified file.
  *
  * const char *housedepot_revision_apply (const char *tag,
+ *                                        const char *clientname,
  *                                        const char *filename,
  *                                        const char *revision);
  * 
@@ -53,14 +64,16 @@
  *   The tag is moved if it was already assigned to another revision.
  *   The tag is created if it did not exist yet.
  *
- * const char *housedepot_revision_delete (const char *filename,
+ * const char *housedepot_revision_delete (const char *clientname,
+ *                                         const char *filename,
  *                                         const char *revision);
  *
  *   Delete a specific revision of a file. This automatically delete all the
  *   user defined tags. One cannot delete a revision referenced by either
  *   predefined tag.
  *
- * const char *housedepot_revision_history (const char *filename);
+ * const char *housedepot_revision_history (const char *clientname,
+ *                                          const char *filename);
  *
  *   Return JSON data that describe the file history.
  */
@@ -143,7 +156,8 @@ static int housedepot_revision_link (const char *target, const char *link) {
     return symlink(target, link);
 }
 
-const char *housedepot_revision_checkin (const char *filename,
+const char *housedepot_revision_checkin (const char *clientname,
+                                         const char *filename,
                                          const char *data, int length) {
     int pathsz;
     int newrev;
@@ -189,6 +203,8 @@ const char *housedepot_revision_checkin (const char *filename,
     if (housedepot_revision_link (fullname, filename))
         return "Cannot create link for default file";
 
+    houselog_event ("FILE", clientname, "CHECKED IN", "AS REVISION %d", newrev);
+
     return 0;
 }
 
@@ -219,6 +235,7 @@ static int housedepot_revision_resolve (const char *filename, const char *tag,
 }
 
 const char *housedepot_revision_apply (const char *tag,
+                                       const char *clientname,
                                        const char *filename,
                                        const char *revision) {
     char fullname[1024];
@@ -234,14 +251,21 @@ const char *housedepot_revision_apply (const char *tag,
         return "invalid revision";
 
     housedepot_trace (HOUSE_INFO, filename, "APPLY", tag, fullname);
+
     snprintf (link, sizeof(link), "%s%c%s", filename, FRM, tag);
     if (housedepot_revision_link (fullname, link))
         return "Cannot create the tag link";
 
     if (!strcmp (tag, "current")) {
+        // Create the link for the GET target, i.e. the name without revision.
         if (housedepot_revision_link (fullname, filename))
             return "Cannot create link for default file";
     }
+
+    const char *realrev = strrchr (fullname, FRM);
+    if (!realrev) realrev = "~(invalid)"; // Thou shall not crash.
+    houselog_event ("FILE", clientname, "APPLIED",
+                    "TAG %s TO REVISION %s", tag, realrev+1);
 
     return 0;
 }
@@ -277,7 +301,8 @@ static int housedepot_revision_compare (const struct dirent **a,
     return alphasort(a, b);
 }
 
-const char *housedepot_revision_delete (const char *filename,
+const char *housedepot_revision_delete (const char *clientname,
+                                        const char *filename,
                                         const char *revision) {
 
     char fullname[1024];
@@ -291,6 +316,7 @@ const char *housedepot_revision_delete (const char *filename,
         if (!strcmp(revision, "current")) return "Cannot delete current";
         if (!strcmp(revision, "latest")) return "Cannot delete latest";
         unlink (fullname);
+        houselog_event ("FILE", clientname, "REMOVED", "TAG %s", revision);
         return 0;
     }
 
@@ -336,9 +362,12 @@ const char *housedepot_revision_delete (const char *filename,
             char *targetsep = strrchr (target, FRM);
             if (targetsep) {
                 if (!strcmp (targetsep+1, revision)) {
-                    unlink(link);
                     housedepot_trace
                         (HOUSE_INFO, filename, "DELETE", files[i]->d_name, 0);
+                    unlink(link);
+                    const char *tag = strrchr (files[i]->d_name, FRM);
+                    if (!tag) tag = "~(invalid)"; // Do not crash.
+                    houselog_event ("FILE", clientname, "DELETED", "TAG %s", tag+1);
                 }
             }
         }
@@ -351,12 +380,17 @@ const char *housedepot_revision_delete (const char *filename,
     // Now that all tag pointing to this revision were removed, we can delete
     // the revision file itself.
     //
-    unlink(fullname);
     housedepot_trace (HOUSE_INFO, filename, "DELETE", fullname, 0);
+    unlink(fullname);
+
+    const char *realrev = strrchr (fullname, FRM);
+    if (!realrev) realrev = "~(invalid)"; // Thou shall not crash.
+    houselog_event ("FILE", clientname, "DELETED", "REVISION %s", realrev+1);
+
     return 0;
 }
 
-const char *housedepot_revision_history (const char *uri,
+const char *housedepot_revision_history (const char *clientname,
                                          const char *filename) {
 
     static char buffer[16000];
@@ -381,7 +415,7 @@ const char *housedepot_revision_history (const char *uri,
 
     int cursor = snprintf (buffer, sizeof(buffer),
                            "{\"host\":\"%s\",\"timestamp\":%d,\"file\":\"%s\"",
-                           housedepot_revision_host, (int)time(0), uri);
+                           housedepot_revision_host, (int)time(0), clientname);
     if (housedepot_revision_portal)
         cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor,
                            ",\"proxy\":\"%s\"", housedepot_revision_portal);

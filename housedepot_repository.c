@@ -173,7 +173,7 @@ static const char *housedepot_repository_page (const char *action,
                 }
             }
         }
-        error = housedepot_revision_checkin (filename, data, length);
+        error = housedepot_revision_checkin (uri, filename, data, length);
         if (error) echttp_error (500, error);
         return "";
     }
@@ -187,7 +187,7 @@ static const char *housedepot_repository_page (const char *action,
             echttp_error (400, "invalid tag name");
             return "";
         }
-        error = housedepot_revision_apply (tag, filename, revision);
+        error = housedepot_revision_apply (tag, uri, filename, revision);
         if (error) echttp_error (500, error);
         return "";
     }
@@ -197,7 +197,7 @@ static const char *housedepot_repository_page (const char *action,
             echttp_error (403, "Revision to delete not specified");
             return "";
         }
-        error = housedepot_revision_delete (filename, revision);
+        error = housedepot_revision_delete (uri, filename, revision);
         if (error) echttp_error (500, error);
         return "";
     }
