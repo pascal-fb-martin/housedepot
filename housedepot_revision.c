@@ -587,6 +587,7 @@ const char *housedepot_revision_history (const char *clientname,
             }
             break;
         default:
+            break;
         }
     }
     snprintf (buffer+cursor, sizeof(buffer)-cursor, "]}");
