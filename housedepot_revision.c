@@ -448,6 +448,7 @@ const char *housedepot_revision_list (const char *clientname,
 
         switch (ent->d_type) {
         case DT_DIR:
+            { // This block is a workaround for errors with some GCC versions.
             // Support only one level of subdirectory (see README.md)
             int i2;
             struct dirent **files2;
@@ -478,6 +479,7 @@ const char *housedepot_revision_list (const char *clientname,
                 sep = ",";
             }
             housedepot_revision_cleanscan (files2, n2);
+            }
             break;
 
         case DT_LNK:
