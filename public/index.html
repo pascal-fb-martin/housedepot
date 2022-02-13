@@ -39,10 +39,10 @@ function depotShowHistory (response) {
         var file = response.history[i];
         var outer = document.createElement("tr");
         outer.depotDeleteMe = true;
-        outer.appendChild
-            (newFileLink(response.file+'?revision='+file.rev,file.rev));
         var timestamp = new Date(file.time * 1000);
-        outer.appendChild(newFileColumn(timestamp.toLocaleString()));
+        outer.appendChild
+            (newFileLink(response.file+'?revision='+file.rev,timestamp.toLocaleString()));
+        outer.appendChild(newFileColumn(file.rev));
 
         var inner = document.createElement("td");
         for (var j = 0; j < response.tags.length; j++) {
@@ -184,9 +184,10 @@ window.onload = function() {
    <br>
    <table class="housewidetable" id="history" border="0">
       <tr>
-         <th width="10%">REVISION</th>
          <th width="20%">DATE</th>
-         <th width="40%">TAGS</th>
+         <th width="10%">REVISION</th>
+         <th width="30%">TAGS</th>
+         <th width="40%">ACTIONS</th>
       </tr>
    </table>
 </body>
