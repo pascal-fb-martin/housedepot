@@ -80,14 +80,27 @@ The allowance for one level of directory is intended to support this recommended
 
 ## Web API
 
+All responses from the HouseDepot server contain the following standard entries:
+- .host: the name of the host that replied.
+- .proxy: if present, the name of the HousePortal proxy to use.
+- .timestamp: the time of this response.
+
 ```
 GET /depot/all
 ```
 Return the list of all repositories present on this HouseDepot service.
+
+The response is a JSON structure with the following entries:
+- .repositories: an array of strings. Each strin is the root URI for one repository.
+
 ```
 GET /depot/<name>/all
 ```
 Return the list of all files present in the specified repository, with their current revision and date (i.e. the revision and file for the current version).
+
+The response is a JSON structure with the following entries:
+- .files: an array of JSON structure items. Each item represent one file with the following elements: .name, .rev and .time.
+
 ```
 GET /depot/<name>/...
 GET /depot/<name>/...?revision=<tag>
@@ -104,7 +117,7 @@ A file history is a json object that contains the name of the server, a timestam
 Each tag definitions is an array with 2 entries: the tag name and the revision number.
 
 Each revision entry is an object with the following entries:
-- .date: an ASCII representation of the revision (PUT) date and time
+- .time: an ASCII representation of the revision (PUT) date and time
 - .rev: the file's numeric revision number.
 
 The arrays have no specified order. The historical order of revisions can be reconstitued either by sorting on date or revision number.

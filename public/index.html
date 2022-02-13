@@ -4,11 +4,12 @@
 <link rel=stylesheet type="text/css" href="/house.css" title="House">
 <script>
 
-function newFileLink (repo, file) {
+function newFileLink (target, text) {
     var inner = document.createElement("td");
     var link = document.createElement("a");
-    link.href = repo + '/' + file;
-    link.innerHTML = file;
+    link.href = target;
+    link.innerHTML = text;
+    link.target = '_blank';
     inner.appendChild(link);
     return inner;
 }
@@ -21,15 +22,87 @@ function newFileColumn (text) {
     return inner;
 }
 
+function depotHideHistory () {
+    var revlist = document.getElementById ('history');
+    var children = revlist.childNodes;
+    for (var i = children.length-1; i >= 0; i--) {
+        if (children[i].depotDeleteMe) revlist.removeChild(children[i]);
+    }
+    var label = document.getElementById ('hisfile');
+    label.innerHTML = "";
+}
+
+function depotShowHistory (response) {
+    depotHideHistory();
+    var revlist = document.getElementById ('history');
+    for (i = response.history.length-1; i >= 0; i--) {
+        var file = response.history[i];
+        var outer = document.createElement("tr");
+        outer.depotDeleteMe = true;
+        outer.appendChild
+            (newFileLink(response.file+'?revision='+file.rev,file.rev));
+        var timestamp = new Date(file.time * 1000);
+        outer.appendChild(newFileColumn(timestamp.toLocaleString()));
+
+        var inner = document.createElement("td");
+        for (var j = 0; j < response.tags.length; j++) {
+            var tag = response.tags[j];
+            if (tag[1] === file.rev) {
+                var button = document.createElement("button");
+                button.innerHTML = tag[0];
+                button.disabled = true;
+                inner.appendChild(button);
+            }
+        }
+        outer.appendChild(inner);
+        revlist.appendChild(outer);
+    }
+    var label = document.getElementById ('hisfile');
+    label.innerHTML = response.file;
+}
+
+function depotHistory () {
+    var repo = this.depotRepo;
+    var file = this.depotFile;
+    var command = new XMLHttpRequest();
+    command.open("GET", repo+"/"+file+"?revision=all");
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            depotShowHistory (JSON.parse(command.responseText));
+        }
+    }
+    command.send(null);
+}
+
+function newFileAction (text, command, repository, file) {
+    var button = document.createElement("button");
+    button.innerHTML = text;
+    button.disabled = false;
+    button.depotRepo = repository;
+    button.depotFile = file;
+    button.onclick = command;
+    return button;
+}
+
 function depotShowFiles (repository, response) {
+    depotHideHistory();
     var filelist = document.getElementById ('files');
+    var children = filelist.childNodes;
+    for (var i = children.length-1; i >= 0; i--) {
+        if (children[i].depotDeleteMe) filelist.removeChild(children[i]);
+    }
     for (var i = 0; i < response.files.length; i++) {
         var file = response.files[i];
         var timestamp = new Date(file.time * 1000);
         var outer = document.createElement("tr");
-        outer.appendChild(newFileLink(repository, file.name));
+        outer.depotDeleteMe = true;
+        outer.appendChild(newFileLink(repository+'/'+file.name, file.name));
         outer.appendChild(newFileColumn(file.rev));
         outer.appendChild(newFileColumn(timestamp.toLocaleString()));
+        var inner = document.createElement("td");
+        inner.appendChild
+            (newFileAction("History", depotHistory, repository, file.name));
+        outer.appendChild(inner);
         filelist.appendChild(outer);
     }
 }
@@ -93,7 +166,7 @@ window.onload = function() {
    </td></tr>
    </table>
    <br>
-   <label for="repo">Repository:</label>
+   <label for="repo" class="houselabel">Repository:</label>
    <select name="repo" id="repo" onChange="depotFiles(this)">
    </select>
    <br>
@@ -102,7 +175,18 @@ window.onload = function() {
          <th width="30%">NAME</th>
          <th width="10%">REVISION</th>
          <th width="20%">DATE</th>
-         <th width="40%"></th>
+         <th width="40%">ACTIONS</th>
+      </tr>
+   </table>
+   <br>
+   <label for="hisfile" class="houselabel">File:</label>
+   <span id="hisfile" class="houselabel"></span>
+   <br>
+   <table class="housewidetable" id="history" border="0">
+      <tr>
+         <th width="10%">REVISION</th>
+         <th width="20%">DATE</th>
+         <th width="40%">TAGS</th>
       </tr>
    </table>
 </body>
