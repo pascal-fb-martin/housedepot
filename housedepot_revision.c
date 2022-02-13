@@ -430,9 +430,6 @@ const char *housedepot_revision_list (const char *clientname,
     int i;
     struct dirent **files;
 
-    int n = scandir (dirname, &files, 0, housedepot_revision_compare);
-    if (n <= 0) return 0;
-
     int cursor = snprintf (buffer, sizeof(buffer),
                            "{\"host\":\"%s\",\"timestamp\":%d",
                            housedepot_revision_host, (int)time(0));
@@ -441,6 +438,7 @@ const char *housedepot_revision_list (const char *clientname,
                            ",\"proxy\":\"%s\"", housedepot_revision_portal);
     cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor, ",\"files\":[");
 
+    int n = scandir (dirname, &files, 0, housedepot_revision_compare);
     const char *sep = "";
     int tags = 1;
 
@@ -506,7 +504,7 @@ const char *housedepot_revision_list (const char *clientname,
         }
     }
     snprintf (buffer+cursor, sizeof(buffer)-cursor, "]}");
-    housedepot_revision_cleanscan (files, n);
+    if (n > 0) housedepot_revision_cleanscan (files, n);
 
     return buffer;
 }
@@ -531,8 +529,6 @@ const char *housedepot_revision_history (const char *clientname,
     int n = scandir (dirname, &files, housedepot_revision_filter,
                                       housedepot_revision_compare);
     scandir_pattern = 0;
-
-    if (n <= 0) return 0;
 
     int cursor = snprintf (buffer, sizeof(buffer),
                            "{\"host\":\"%s\",\"timestamp\":%d,\"file\":\"%s\"",
@@ -593,7 +589,7 @@ const char *housedepot_revision_history (const char *clientname,
     }
     snprintf (buffer+cursor, sizeof(buffer)-cursor, "]}");
 
-    housedepot_revision_cleanscan (files, n);
+    if (n > 0) housedepot_revision_cleanscan (files, n);
     return buffer;
 }
 

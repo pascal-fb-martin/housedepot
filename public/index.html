@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel=stylesheet type="text/css" href="/house.css" title="House">
+<script>
+
+function newFileLink (repo, file) {
+    var inner = document.createElement("td");
+    var link = document.createElement("a");
+    link.href = repo + '/' + file;
+    link.innerHTML = file;
+    inner.appendChild(link);
+    return inner;
+}
+
+function newFileColumn (text) {
+    var inner = document.createElement("td");
+    var label = document.createElement("span");
+    label.innerHTML = text;
+    inner.appendChild(label);
+    return inner;
+}
+
+function depotShowFiles (repository, response) {
+    var filelist = document.getElementById ('files');
+    for (var i = 0; i < response.files.length; i++) {
+        var file = response.files[i];
+        var timestamp = new Date(file.time * 1000);
+        var outer = document.createElement("tr");
+        outer.appendChild(newFileLink(repository, file.name));
+        outer.appendChild(newFileColumn(file.rev));
+        outer.appendChild(newFileColumn(timestamp.toLocaleString()));
+        filelist.appendChild(outer);
+    }
+}
+
+function depotFiles (selected) {
+    var command = new XMLHttpRequest();
+    command.open("GET", selected.value+"/all");
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            depotShowFiles (selected.value, JSON.parse(command.responseText));
+        }
+    }
+    command.send(null);
+}
+
+window.onload = function() {
+
+   function depotShowRepositories (response) {
+      var title = response.host+' - Depot';
+      document.getElementsByTagName ('title')[0].innerHTML = title;
+      if (response.proxy) {
+         document.getElementById('portal').href = 'http://'+response.proxy+'/index.html';
+      }
+      var repobox = document.getElementById ('repo');
+      for (var i = 0; i < response.repositories.length; i++) {
+           var name = response.repositories[i];
+           var item = document.createElement("option");
+           item.setAttribute("value", name);
+           item.appendChild(document.createTextNode(name));
+           repo.appendChild(item);
+       }
+   }
+
+   function depotRepositories () {
+       var command = new XMLHttpRequest();
+       command.open("GET", "/depot/all");
+       command.onreadystatechange = function () {
+           if (command.readyState === 4 && command.status === 200) {
+               depotShowRepositories (JSON.parse(command.responseText));
+               depotFiles(document.getElementById ('repo'));
+           }
+       }
+       command.send(null);
+   }
+   depotRepositories();
+};
+</script>
+<head>
+   <title>Depot</title>
+</head>
+<body>
+   <table class="housetopcontainer">
+   <tr><td>
+   <table class="housetop">
+   <tr>
+   <td><a id="portal" href="/index.html">Portal</a></td>
+   <td><span>Depot</span></td>
+   <td><a href="/depot/events.html">Events</a></td>
+   </tr>
+   </table>
+   </td></tr>
+   </table>
+   <br>
+   <label for="repo">Repository:</label>
+   <select name="repo" id="repo" onChange="depotFiles(this)">
+   </select>
+   <br>
+   <table class="housewidetable" id="files" border="0">
+      <tr>
+         <th width="30%">NAME</th>
+         <th width="10%">REVISION</th>
+         <th width="20%">DATE</th>
+         <th width="40%"></th>
+      </tr>
+   </table>
+</body>
+</html>
+
