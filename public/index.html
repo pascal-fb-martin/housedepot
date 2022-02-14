@@ -22,50 +22,32 @@ function newFileColumn (text) {
     return inner;
 }
 
+function newFileAction (text, command, uri, rev, disabled) {
+    var button = document.createElement("button");
+    button.innerHTML = text;
+    if (disabled)
+        button.disabled = true;
+    else
+        button.disabled = false;
+    button.depotUri = uri;
+    if (rev) button.depotRev = rev;
+    button.onclick = command;
+    return button;
+}
+
 function depotHideHistory () {
     var revlist = document.getElementById ('history');
     var children = revlist.childNodes;
     for (var i = children.length-1; i >= 0; i--) {
-        if (children[i].depotDeleteMe) revlist.removeChild(children[i]);
+        if (children[i].depotRemoveMe) revlist.removeChild(children[i]);
     }
     var label = document.getElementById ('hisfile');
     label.innerHTML = "";
 }
 
-function depotShowHistory (response) {
-    depotHideHistory();
-    var revlist = document.getElementById ('history');
-    for (i = response.history.length-1; i >= 0; i--) {
-        var file = response.history[i];
-        var outer = document.createElement("tr");
-        outer.depotDeleteMe = true;
-        var timestamp = new Date(file.time * 1000);
-        outer.appendChild
-            (newFileLink(response.file+'?revision='+file.rev,timestamp.toLocaleString()));
-        outer.appendChild(newFileColumn(file.rev));
-
-        var inner = document.createElement("td");
-        for (var j = 0; j < response.tags.length; j++) {
-            var tag = response.tags[j];
-            if (tag[1] === file.rev) {
-                var button = document.createElement("button");
-                button.innerHTML = tag[0];
-                button.disabled = true;
-                inner.appendChild(button);
-            }
-        }
-        outer.appendChild(inner);
-        revlist.appendChild(outer);
-    }
-    var label = document.getElementById ('hisfile');
-    label.innerHTML = response.file;
-}
-
-function depotHistory () {
-    var repo = this.depotRepo;
-    var file = this.depotFile;
+function depotGetHistory (uri) {
     var command = new XMLHttpRequest();
-    command.open("GET", repo+"/"+file+"?revision=all");
+    command.open("GET", uri+"?revision=all");
     command.onreadystatechange = function () {
         if (command.readyState === 4 && command.status === 200) {
             depotShowHistory (JSON.parse(command.responseText));
@@ -74,14 +56,76 @@ function depotHistory () {
     command.send(null);
 }
 
-function newFileAction (text, command, repository, file) {
-    var button = document.createElement("button");
-    button.innerHTML = text;
-    button.disabled = false;
-    button.depotRepo = repository;
-    button.depotFile = file;
-    button.onclick = command;
-    return button;
+function depotDelete () {
+    var uri = this.depotUri;
+    var command = new XMLHttpRequest();
+    command.open("DELETE", uri+'?revision='+this.depotRev);
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            depotGetHistory (uri);
+        }
+    }
+    command.send(null);
+}
+
+function depotCurrent () {
+    var uri = this.depotUri;
+    var command = new XMLHttpRequest();
+    command.open("POST", uri+'?tag=current&revision='+this.depotRev);
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            depotGetHistory (uri);
+        }
+    }
+    command.send(null);
+}
+
+function depotShowHistory (response) {
+    depotHideHistory();
+    var revlist = document.getElementById ('history');
+    for (i = response.history.length-1; i >= 0; i--) {
+        var file = response.history[i];
+        var outer = document.createElement("tr");
+        outer.depotRemoveMe = true;
+        var timestamp = new Date(file.time * 1000);
+        outer.appendChild
+            (newFileLink(response.file+'?revision='+file.rev,timestamp.toLocaleString()));
+        outer.appendChild(newFileColumn(file.rev));
+
+        var inner = document.createElement("td");
+        var isprotected = false;
+        var iscurrent = false;
+        for (var j = 0; j < response.tags.length; j++) {
+            var tag = response.tags[j];
+            if (tag[1] === file.rev) {
+                var button = document.createElement("button");
+                button.innerHTML = tag[0];
+                button.disabled = true;
+                inner.appendChild(button);
+                if (tag[0] === "current") {
+                    isprotected = true;
+                    iscurrent = true;
+                } else if (tag[0] === "latest") {
+                    isprotected = true;
+                }
+            }
+        }
+        outer.appendChild(inner);
+        inner = document.createElement("td");
+        inner.appendChild
+            (newFileAction("Delete", depotDelete, response.file, file.rev, isprotected));
+        inner.appendChild
+            (newFileAction("Current", depotCurrent, response.file, file.rev, iscurrent));
+        outer.appendChild(inner);
+        revlist.appendChild(outer);
+    }
+    var label = document.getElementById ('hisfile');
+    label.innerHTML = response.file;
+    label.scrollIntoView();
+}
+
+function depotHistory () {
+    depotGetHistory (this.depotUri);
 }
 
 function depotShowFiles (repository, response) {
@@ -89,19 +133,19 @@ function depotShowFiles (repository, response) {
     var filelist = document.getElementById ('files');
     var children = filelist.childNodes;
     for (var i = children.length-1; i >= 0; i--) {
-        if (children[i].depotDeleteMe) filelist.removeChild(children[i]);
+        if (children[i].depotRemoveMe) filelist.removeChild(children[i]);
     }
     for (var i = 0; i < response.files.length; i++) {
         var file = response.files[i];
         var timestamp = new Date(file.time * 1000);
         var outer = document.createElement("tr");
-        outer.depotDeleteMe = true;
+        outer.depotRemoveMe = true;
         outer.appendChild(newFileLink(repository+'/'+file.name, file.name));
         outer.appendChild(newFileColumn(file.rev));
         outer.appendChild(newFileColumn(timestamp.toLocaleString()));
         var inner = document.createElement("td");
         inner.appendChild
-            (newFileAction("History", depotHistory, repository, file.name));
+            (newFileAction("History", depotHistory, repository+'/'+file.name));
         outer.appendChild(inner);
         filelist.appendChild(outer);
     }
