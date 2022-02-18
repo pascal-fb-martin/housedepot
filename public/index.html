@@ -80,6 +80,18 @@ function depotCurrent () {
     command.send(null);
 }
 
+function depotStable () {
+    var uri = this.depotUri;
+    var command = new XMLHttpRequest();
+    command.open("POST", uri+'?tag=stable&revision='+this.depotRev);
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            depotGetHistory (uri);
+        }
+    }
+    command.send(null);
+}
+
 function depotShowHistory (response) {
     depotHideHistory();
     var revlist = document.getElementById ('history');
@@ -95,6 +107,7 @@ function depotShowHistory (response) {
         var inner = document.createElement("td");
         var isprotected = false;
         var iscurrent = false;
+        var isstable = false;
         for (var j = 0; j < response.tags.length; j++) {
             var tag = response.tags[j];
             if (tag[1] === file.rev) {
@@ -105,6 +118,8 @@ function depotShowHistory (response) {
                 if (tag[0] === "current") {
                     isprotected = true;
                     iscurrent = true;
+                } else if (tag[0] === "stable") {
+                    isstable = true;
                 } else if (tag[0] === "latest") {
                     isprotected = true;
                 }
@@ -113,9 +128,11 @@ function depotShowHistory (response) {
         outer.appendChild(inner);
         inner = document.createElement("td");
         inner.appendChild
-            (newFileAction("Delete", depotDelete, response.file, file.rev, isprotected));
-        inner.appendChild
             (newFileAction("Current", depotCurrent, response.file, file.rev, iscurrent));
+        inner.appendChild
+            (newFileAction("Stable", depotStable, response.file, file.rev, isstable));
+        inner.appendChild
+            (newFileAction("Delete", depotDelete, response.file, file.rev, isprotected));
         outer.appendChild(inner);
         revlist.appendChild(outer);
     }
