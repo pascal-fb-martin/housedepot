@@ -100,6 +100,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <dirent.h>
 
 #include <houselog.h>
@@ -169,6 +170,36 @@ static int housedepot_revision_link (const char *target, const char *link) {
     return symlink(target, link);
 }
 
+static int housedepot_revision_same (const char *filename,
+                                     const char *data, int length) {
+    char buffer[1024];
+    int count;
+    int offset = 0;
+
+    int fd = open (filename, O_RDONLY);
+    if (fd < 0) return 0;
+
+    do {
+        count = read (fd, buffer, sizeof(buffer));
+        if (count > 0) {
+            int next = offset + count;
+            if (next > length) {
+                close(fd);
+                return 0; // The existing file is longer.
+            }
+            if (bcmp (data+offset, buffer, count)) {
+                close(fd);
+                return 0; // Bytes are different.
+            }
+            offset = next;
+        }
+    } while (count == sizeof(buffer));
+    close(fd);
+
+    if (offset < length) return 0; // The existing file is shorter.
+    return 1;
+}
+
 const char *housedepot_revision_checkin (const char *clientname,
                                          const char *filename,
                                          const char *data, int length) {
@@ -197,6 +228,13 @@ const char *housedepot_revision_checkin (const char *clientname,
         if (!rev) return "invalid revision database";
         newrev = atoi (rev+1) + 1;
         if (newrev <= 1) return "invalid revision number";
+
+        // Compare with the existing latest revision to avoid duplicates.
+        //
+        if (housedepot_revision_same (fullname, data, length)) {
+            housedepot_trace (HOUSE_INFO, filename, "DUPLICATES", rev+1, 0);
+            return 0; // Silently ignore this duplicate.
+        }
     }
 
     // Create the (real) file.
@@ -222,7 +260,7 @@ const char *housedepot_revision_checkin (const char *clientname,
     if (housedepot_revision_link (fullname, filename))
         return "Cannot create link for default file";
 
-    houselog_event ("FILE", clientname, "CHECKED IN", "AS REVISION %d", newrev);
+    houselog_event ("FILE", clientname, "CHECKED IN", "REVISION %d", newrev);
 
     return 0;
 }
