@@ -94,9 +94,9 @@ The response is a JSON structure with the following entries:
 - .repositories: an array of strings. Each strin is the root URI for one repository.
 
 ```
-GET /depot/<name>/all
+GET /depot/<path>/all
 ```
-Return the list of all files present in the specified repository, with their current revision and date (i.e. the revision and file for the current version).
+Return the list of all files present in the specified repository, or repository's subdirectory, with their current revision and date (i.e. the revision and file for the current version).
 
 The response is a JSON structure with the following entries:
 - .files: an array of JSON structure items. Each item represent one file with the following elements: .name, .rev and .time.

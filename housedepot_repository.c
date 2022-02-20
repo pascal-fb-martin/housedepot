@@ -48,6 +48,8 @@
 #include "housedepot_revision.h"
 #include "housedepot_repository.h"
 
+#define DEBUG if (echttp_isdebug()) printf
+
 static echttp_catalog housedepot_repository_roots;
 
 static echttp_catalog housedepot_repository_type;
@@ -114,21 +116,32 @@ static const char *housedepot_repository_page (const char *action,
                                                const char *uri,
                                                const char *data, int length) {
     const char *path;
+    char localuri[1024];
     char rooturi[1024];
     char filename[1024];
     const char * error;
+    int is_all = 0;
 
     if (strstr(uri, "../")) {
-        if (echttp_isdebug()) printf ("Security violation: %s\n", uri);
+        DEBUG ("Security violation: %s\n", uri);
         echttp_error (406, "Not Acceptable");
         return "";
     }
 
-    strncpy (rooturi, uri, sizeof(rooturi)); // Make a writable copy.
-    rooturi[sizeof(rooturi)-1] = 0;
+    snprintf(localuri, sizeof(localuri), "%s", uri); // Make a writable copy.
 
+    // Detect the /all terminator and consume it.
+    //
+    char *base = strrchr (localuri, '/');
+    if (base && (!strcmp (base, "/all"))) {
+        is_all = 1;
+        *base = 0;
+        DEBUG ("List request for %s\n", localuri);
+    }
+
+    snprintf(rooturi, sizeof(rooturi), "%s", localuri);
     for(;;) {
-        if (echttp_isdebug()) printf ("Searching static map for %s\n", rooturi);
+        DEBUG ("Searching static map for %s\n", rooturi);
         path = echttp_catalog_get (&housedepot_repository_roots, rooturi);
         if (path) break;
         char *sep = strrchr (rooturi+1, '/');
@@ -139,29 +152,28 @@ static const char *housedepot_repository_page (const char *action,
         echttp_error (404, "Path not found"); // Should never happen, but.
         return "";
     }
-    if (echttp_isdebug()) printf ("found match for %s: %s\n", rooturi, path);
+    DEBUG ("found match for %s: %s\n", rooturi, path);
 
     size_t pathlen = strlen(path);
     if (pathlen >= sizeof(filename)) {
         echttp_error (500, "Buffer overflow"); // Should never happen, but.
         return "";
     }
-    strncpy (filename, path, sizeof(filename));
-    strncpy (filename+pathlen, uri+strlen(rooturi), sizeof(filename)-pathlen);
-    filename[sizeof(filename)-1] = 0;
+    snprintf (filename, sizeof(filename),
+              "%s%s", path, localuri+strlen(rooturi));
 
     const char *revision = echttp_parameter_get ("revision");
 
     if (!strcmp (action, "GET")) {
-        if (!strcmp (uri+strlen(rooturi), "/all")) {
+        if (is_all) {
             echttp_content_type_json();
-            return housedepot_revision_list (uri, path);
+            return housedepot_revision_list (localuri, filename);
         }
         if (!revision)
             revision = "current";
         else if (!strcmp (revision, "all")) {
             echttp_content_type_json();
-            const char *data = housedepot_revision_history (uri, filename);
+            const char *data = housedepot_revision_history (localuri, filename);
             if (!data) {
                 echttp_error (404, "Not found");
                 return "";
@@ -171,6 +183,11 @@ static const char *housedepot_repository_page (const char *action,
         int size;
         int fd = housedepot_revision_checkout (filename, revision);
         return housedepot_repository_transfer (fd, filename, revision);
+    }
+
+    if (is_all) {
+        echttp_error (500, "Invalid URI"); // Only valid in GET method.
+        return "";
     }
 
     if (!strcmp (action, "PUT")) {
@@ -185,7 +202,7 @@ static const char *housedepot_repository_page (const char *action,
                 }
             }
         }
-        error = housedepot_revision_checkin (uri, filename, data, length);
+        error = housedepot_revision_checkin (localuri, filename, data, length);
         if (error) echttp_error (500, error);
         return "";
     }
@@ -199,7 +216,7 @@ static const char *housedepot_repository_page (const char *action,
             echttp_error (400, "invalid tag name");
             return "";
         }
-        error = housedepot_revision_apply (tag, uri, filename, revision);
+        error = housedepot_revision_apply (tag, localuri, filename, revision);
         if (error) echttp_error (500, error);
         return "";
     }
@@ -209,7 +226,7 @@ static const char *housedepot_repository_page (const char *action,
             echttp_error (403, "Revision to delete not specified");
             return "";
         }
-        error = housedepot_revision_delete (uri, filename, revision);
+        error = housedepot_revision_delete (localuri, filename, revision);
         if (error) echttp_error (500, error);
         return "";
     }

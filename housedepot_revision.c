@@ -473,8 +473,8 @@ const char *housedepot_revision_list (const char *clientname,
                 struct stat fs;
                 if (stat (target, &fs) != 0) continue;
                 cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor,
-                                    "%s{\"name\":\"%s/%s\",\"rev\":\"%s\",\"time\":%d}",
-                                    sep, ent->d_name, ent2->d_name, rev+1, (int)(fs.st_mtime));
+                                    "%s{\"name\":\"%s/%s/%s\",\"rev\":\"%s\",\"time\":%d}",
+                                    sep, clientname, ent->d_name, ent2->d_name, rev+1, (int)(fs.st_mtime));
 
                 sep = ",";
             }
@@ -495,8 +495,8 @@ const char *housedepot_revision_list (const char *clientname,
             struct stat fs;
             if (stat (target, &fs) != 0) break;
             cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor,
-                                "%s{\"name\":\"%s\",\"rev\":\"%s\",\"time\":%d}",
-                                sep, ent->d_name, rev+1, (int)(fs.st_mtime));
+                                "%s{\"name\":\"%s/%s\",\"rev\":\"%s\",\"time\":%d}",
+                                sep, clientname, ent->d_name, rev+1, (int)(fs.st_mtime));
             sep = ",";
             break;
 

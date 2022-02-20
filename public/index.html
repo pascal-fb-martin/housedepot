@@ -157,12 +157,13 @@ function depotShowFiles (repository, response) {
         var timestamp = new Date(file.time * 1000);
         var outer = document.createElement("tr");
         outer.depotRemoveMe = true;
-        outer.appendChild(newFileLink(repository+'/'+file.name, file.name));
+        var basename = file.name.substring(repository.length+1);
+        outer.appendChild(newFileLink(file.name, basename));
         outer.appendChild(newFileColumn(file.rev));
         outer.appendChild(newFileColumn(timestamp.toLocaleString()));
         var inner = document.createElement("td");
         inner.appendChild
-            (newFileAction("History", depotHistory, repository+'/'+file.name));
+            (newFileAction("History", depotHistory, file.name));
         outer.appendChild(inner);
         filelist.appendChild(outer);
     }
