@@ -18,15 +18,17 @@ housedepot: $(OBJS)
 	gcc -g -O -o housedepot $(OBJS) -lhouseportal -lechttp -lssl -lcrypto -lgpiod -lrt
 
 install:
-	if [ -e /etc/init.d/housedepot ] ; then systemctl stop housedepot ; fi
+	if [ -e /etc/init.d/housedepot ] ; then systemctl stop housedepot ; systemctl disable housedepot ; rm -f /etc/init.d/housedepot ; fi
+	if [ -e /lib/systemd/system/housedepot.service ] ; then systemctl stop housedepot ; systemctl disable housedepot ; rm -f /lib/systemd/system/housedepot.service ; fi
 	mkdir -p /usr/local/bin
 	mkdir -p /var/lib/house
 	mkdir -p /etc/house
-	rm -f /usr/local/bin/housedepot /etc/init.d/housedepot
+	rm -f /usr/local/bin/housedepot
 	cp housedepot /usr/local/bin
-	cp init.debian /etc/init.d/housedepot
-	chown root:root /usr/local/bin/housedepot /etc/init.d/housedepot
-	chmod 755 /usr/local/bin/housedepot /etc/init.d/housedepot
+	chown root:root /usr/local/bin/housedepot
+	chmod 755 /usr/local/bin/housedepot
+	cp systemd.service /lib/systemd/system/housedepot.service
+	chown root:root /lib/systemd/system/housedepot.service
 	mkdir -p $(SHARE)/public/depot
 	chmod 755 $(SHARE) $(SHARE)/public $(SHARE)/public/depot
 	cp public/* $(SHARE)/public/depot
@@ -40,7 +42,8 @@ install:
 uninstall:
 	systemctl stop housedepot
 	systemctl disable housedepot
-	rm -f /usr/local/bin/housedepot /etc/init.d/housedepot
+	rm -f /usr/local/bin/housedepot
+	rm -f /lib/systemd/system/housedepot.service /etc/init.d/housedepot
 	systemctl daemon-reload
 
 purge: uninstall

@@ -1,0 +1,12 @@
+[Unit]
+Description=the house configuration repository
+After=network-online.target houseportal.service
+
+[Service]
+EnvironmentFile=-/etc/default/housedepot
+EnvironmentFile=-/etc/sysconfig/housedepot
+ExecStart=/usr/local/bin/housedepot $OPTS
+
+[Install]
+WantedBy=multi-user.target
+
