@@ -42,6 +42,7 @@ install:
 uninstall:
 	systemctl stop housedepot
 	systemctl disable housedepot
+	rm -rf $(SHARE)/public/depot
 	rm -f /usr/local/bin/housedepot
 	rm -f /lib/systemd/system/housedepot.service /etc/init.d/housedepot
 	systemctl daemon-reload
