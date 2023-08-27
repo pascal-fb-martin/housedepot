@@ -1,8 +1,30 @@
+# HouseDepot - a log and ressource file storage service.
+#
+# Copyright 2023, Pascal Martin
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor,
+# Boston, MA  02110-1301, USA.
+
+HAPP=housedepot
+HROOT=/usr/local
+SHARE=$(HROOT)/share/house
+
+# Application build. --------------------------------------------
 
 OBJS= housedepot.o housedepot_repository.o housedepot_revision.o
 LIBOJS=
-
-SHARE=/usr/local/share/house
 
 all: housedepot
 
@@ -17,36 +39,32 @@ rebuild: clean all
 housedepot: $(OBJS)
 	gcc -g -O -o housedepot $(OBJS) -lhouseportal -lechttp -lssl -lcrypto -lgpiod -lrt
 
-install:
-	if [ -e /etc/init.d/housedepot ] ; then systemctl stop housedepot ; systemctl disable housedepot ; rm -f /etc/init.d/housedepot ; fi
-	if [ -e /lib/systemd/system/housedepot.service ] ; then systemctl stop housedepot ; systemctl disable housedepot ; rm -f /lib/systemd/system/housedepot.service ; fi
-	mkdir -p /usr/local/bin
-	mkdir -p /var/lib/house
+# Application installation. -------------------------------------
+
+install-app:
+	mkdir -p $(HROOT)/bin
 	mkdir -p /etc/house
-	rm -f /usr/local/bin/housedepot
-	cp housedepot /usr/local/bin
-	chown root:root /usr/local/bin/housedepot
-	chmod 755 /usr/local/bin/housedepot
-	cp systemd.service /lib/systemd/system/housedepot.service
-	chown root:root /lib/systemd/system/housedepot.service
+	rm -f $(HROOT)/bin/housedepot
+	cp housedepot $(HROOT)/bin
+	chown root:root $(HROOT)/bin/housedepot
+	chmod 755 $(HROOT)/bin/housedepot
 	mkdir -p $(SHARE)/public/depot
 	chmod 755 $(SHARE) $(SHARE)/public $(SHARE)/public/depot
 	cp public/* $(SHARE)/public/depot
 	chown root:root $(SHARE)/public/depot/*
 	chmod 644 $(SHARE)/public/depot/*
 	touch /etc/default/housedepot
-	systemctl daemon-reload
-	systemctl enable housedepot
-	systemctl start housedepot
 
-uninstall:
-	systemctl stop housedepot
-	systemctl disable housedepot
+uninstall-app:
 	rm -rf $(SHARE)/public/depot
-	rm -f /usr/local/bin/housedepot
-	rm -f /lib/systemd/system/housedepot.service /etc/init.d/housedepot
-	systemctl daemon-reload
+	rm -f $(HROOT)/bin/housedepot
 
-purge: uninstall
+purge-app:
+
+purge-config:
 	rm -rf /etc/default/housedepot
+
+# System installation. ------------------------------------------
+
+include $(SHARE)/install.mak
 
