@@ -273,7 +273,7 @@ static const char *housedepot_repository_list (const char *action,
                               housedepot_repository_list_iterator);
 
     cursor = housedepot_repositories_cursor;
-    snprintf (buffer+cursor, sizeof(buffer)-cursor, "]}");
+    snprintf (buffer+cursor, size-cursor, "]}");
     echttp_content_type_json();
     return buffer;
 }
