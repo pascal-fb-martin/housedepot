@@ -202,7 +202,12 @@ static const char *housedepot_repository_page (const char *action,
                 }
             }
         }
-        error = housedepot_revision_checkin (localuri, filename, data, length);
+        time_t timestamp = 0;
+        const char *timestampstring = echttp_parameter_get ("time");
+        if (timestampstring) timestamp = atol(timestampstring);
+
+        error = housedepot_revision_checkin
+                   (localuri, filename, timestamp, data, length);
         if (error) echttp_error (500, error);
         return "";
     }

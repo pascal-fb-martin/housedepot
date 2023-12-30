@@ -10,6 +10,7 @@ int housedepot_revision_checkout (const char *filename,
 
 const char *housedepot_revision_checkin (const char *clientname,
                                          const char *filename,
+                                         time_t      timestamp,
                                          const char *data, int length);
 
 const char *housedepot_revision_apply (const char *tag,

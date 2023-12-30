@@ -123,11 +123,11 @@ Each revision entry is an object with the following entries:
 The arrays have no specified order. The historical order of revisions can be reconstitued either by sorting on date or revision number.
 
 ```
-PUT /depot/<name>/...
+PUT /depot/<name>/...[?time=<timestamp>]
 ```
 Store a new revision of the specified file. That revision becomes the current version of that file. Note that there is no revision's comment: this service is not intended to compete with Git..
 
-The file may not exist, in which case it is created.
+The file may not exist, in which case it is created. The optional time parameter forces the file revision's timestamp to the specified value.
 
 ```
 POST /depot/<name>/...?revision=<tag>

@@ -58,6 +58,7 @@
  *
  * const char *housedepot_revision_checkin (const char *clientname,
  *                                          const char *filename,
+ *                                          time_t      timestamp,
  *                                          const char *data, int length);
  *
  *   Checkin the provided data as the new current content of the specified file.
@@ -94,6 +95,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <utime.h>
 #include <errno.h>
 
 #include <ctype.h>
@@ -202,6 +204,7 @@ static int housedepot_revision_same (const char *filename,
 
 const char *housedepot_revision_checkin (const char *clientname,
                                          const char *filename,
+                                         time_t      timestamp,
                                          const char *data, int length) {
     int pathsz;
     int newrev;
@@ -245,6 +248,12 @@ const char *housedepot_revision_checkin (const char *clientname,
     if (fd < 0) return "Cannot open for writing";
     if (write (fd, data, length) != length) return "Cannot write the data";
     close(fd);
+
+    if (timestamp > 0) {
+        struct utimbuf ut;
+        ut.actime = ut.modtime = timestamp;
+        utime (fullname, &ut);
+    }
 
     // Set the standard tags as symbolic links: ~latest and ~current.
     //
