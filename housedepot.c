@@ -50,7 +50,6 @@ static int use_houseportal = 0;
 
 static void housedepot_background (int fd, int mode) {
 
-    static time_t LastFlush = 0;
     static time_t LastRenewal = 0;
     time_t now = time(0);
 
@@ -64,6 +63,7 @@ static void housedepot_background (int fd, int mode) {
             LastRenewal = now;
         }
     }
+    houselog_background (now);
 }
 
 static void housedepot_protect (const char *method, const char *uri) {
