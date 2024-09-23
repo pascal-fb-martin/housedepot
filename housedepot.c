@@ -100,6 +100,7 @@ int main (int argc, const char **argv) {
     housedepot_repository_initialize (houselog_host(), houseportal_server());
 
     housedepot_repository_route ("/depot/config", "/var/lib/house/config");
+    housedepot_repository_route ("/depot/state", "/var/lib/house/state");
     housedepot_repository_route ("/depot/scripts", "/var/lib/house/scripts");
 
     for (i = 1; i < argc; ++i) {

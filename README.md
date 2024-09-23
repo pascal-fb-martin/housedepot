@@ -51,6 +51,7 @@ Since a file may be modified by another instance of the same service, it is reco
 This web API supports multiple repositories, each with its own root URI. Some repositories are installed by default, others can be defined by the user. The default repositories (and their directory path) are:
 ```
 /depot/config (/var/lib/house/config)
+/depot/state (/var/lib/house/state)
 /depot/scripts (/var/lib/house/scripts)
 ```
 

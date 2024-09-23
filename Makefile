@@ -54,8 +54,8 @@ install-app:
 	chown root:root $(SHARE)/public/depot/*
 	chmod 644 $(SHARE)/public/depot/*
 	touch /etc/default/housedepot
-	mkdir -p /var/lib/house/config /var/lib/house/scripts
-	chmod 755 /var/lib/house/config /var/lib/house/scripts
+	mkdir -p /var/lib/house/config /var/lib/house/state /var/lib/house/scripts
+	chmod 755 /var/lib/house/config /var/lib/house/state /var/lib/house/scripts
 
 uninstall-app:
 	rm -rf $(SHARE)/public/depot
