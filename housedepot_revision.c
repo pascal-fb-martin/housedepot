@@ -627,7 +627,7 @@ const char *housedepot_revision_history (const char *clientname,
                 if (stat (fullname, &filestat) == 0) {
                     cursor += 
                         snprintf (buffer+cursor, sizeof(buffer)-cursor,
-                                  "%s{\"rev\":%s,\"time\":%d}",
+                                  "%s{\"rev\":%s,\"time\":%lld}",
                                   sep, ver+1, filestat.st_mtime);
                     sep = ",";
                 }
