@@ -4,6 +4,8 @@
 <link rel=stylesheet type="text/css" href="/house.css" title="House">
 <script>
 
+var CurrentDepotFileUri = false;
+
 function newFileLink (target, text) {
     var inner = document.createElement("td");
     var link = document.createElement("a");
@@ -138,15 +140,14 @@ function depotShowHistory (response) {
     }
     var label = document.getElementById ('hisfile');
     label.innerHTML = response.file;
-    label.scrollIntoView();
 }
 
 function depotHistory () {
+    CurrentDepotFileUri = this.depotUri;
     depotGetHistory (this.depotUri);
 }
 
 function depotShowFiles (repository, response) {
-    depotHideHistory();
     var filelist = document.getElementById ('files');
     var children = filelist.childNodes;
     for (var i = children.length-1; i >= 0; i--) {
@@ -169,7 +170,7 @@ function depotShowFiles (repository, response) {
     }
 }
 
-function depotFiles (selected) {
+function depotGetFiles (selected) {
     var command = new XMLHttpRequest();
     command.open("GET", selected.value+"/all");
     command.onreadystatechange = function () {
@@ -180,6 +181,19 @@ function depotFiles (selected) {
     command.send(null);
 }
 
+function depotRepository (selected) {
+    depotHideHistory();
+    CurrentDepotFileUri = false;
+    depotGetFiles (selected);
+}
+
+function depotRefresh () {
+    var x = window.scrollX;
+    var y = window.scrollY;
+    depotGetFiles(document.getElementById ('repo'));
+    if (CurrentDepotFileUri) depotGetHistory (CurrentDepotFileUri);
+    window.scrollTo(x, y);
+}
 window.onload = function() {
 
    function depotShowRepositories (response) {
@@ -204,12 +218,14 @@ window.onload = function() {
        command.onreadystatechange = function () {
            if (command.readyState === 4 && command.status === 200) {
                depotShowRepositories (JSON.parse(command.responseText));
-               depotFiles(document.getElementById ('repo'));
+               depotGetFiles(document.getElementById ('repo'));
            }
        }
        command.send(null);
    }
    depotRepositories();
+
+   setInterval (depotRefresh, 1000);
 };
 </script>
 <head>
@@ -229,7 +245,7 @@ window.onload = function() {
    </table>
    <br>
    <label for="repo" class="houselabel">Repository:</label>
-   <select name="repo" id="repo" onChange="depotFiles(this)">
+   <select name="repo" id="repo" onChange="depotRepository(this)">
    </select>
    <br>
    <table class="housewidetable" id="files" border="0">
