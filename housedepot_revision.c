@@ -520,8 +520,8 @@ const char *housedepot_revision_list (const char *clientname,
                 struct stat fs;
                 if (stat (target, &fs) != 0) continue;
                 cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor,
-                                    "%s{\"name\":\"%s/%s/%s\",\"rev\":\"%s\",\"time\":%lld}",
-                                    sep, clientname, ent->d_name, ent2->d_name, rev+1, (int)(fs.st_mtime));
+                                    "%s{\"name\":\"%s/%s/%s\",\"rev\":\"%s\",\"time\":%ld}",
+                                    sep, clientname, ent->d_name, ent2->d_name, rev+1, (long)(fs.st_mtime));
 
                 sep = ",";
             }
@@ -542,8 +542,8 @@ const char *housedepot_revision_list (const char *clientname,
             struct stat fs;
             if (stat (target, &fs) != 0) break;
             cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor,
-                                "%s{\"name\":\"%s/%s\",\"rev\":\"%s\",\"time\":%lld}",
-                                sep, clientname, ent->d_name, rev+1, (int)(fs.st_mtime));
+                                "%s{\"name\":\"%s/%s\",\"rev\":\"%s\",\"time\":%ld}",
+                                sep, clientname, ent->d_name, rev+1, (long)(fs.st_mtime));
             sep = ",";
             break;
 
@@ -580,8 +580,8 @@ const char *housedepot_revision_history (const char *clientname,
     scandir_pattern = 0;
 
     int cursor = snprintf (buffer, sizeof(buffer),
-                           "{\"host\":\"%s\",\"timestamp\":%d,\"file\":\"%s\"",
-                           housedepot_revision_host, (int)time(0), clientname);
+                           "{\"host\":\"%s\",\"timestamp\":%ld,\"file\":\"%s\"",
+                           housedepot_revision_host, (long)time(0), clientname);
     if (housedepot_revision_portal)
         cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor,
                            ",\"proxy\":\"%s\"", housedepot_revision_portal);
@@ -627,8 +627,8 @@ const char *housedepot_revision_history (const char *clientname,
                 if (stat (fullname, &filestat) == 0) {
                     cursor += 
                         snprintf (buffer+cursor, sizeof(buffer)-cursor,
-                                  "%s{\"rev\":%s,\"time\":%lld}",
-                                  sep, ver+1, filestat.st_mtime);
+                                  "%s{\"rev\":%s,\"time\":%ld}",
+                                  sep, ver+1, (long)(filestat.st_mtime));
                     sep = ",";
                 }
             }
