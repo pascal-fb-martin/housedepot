@@ -48,22 +48,27 @@ An application is normally concerned only with doing GET of the current version 
 
 Since a file may be modified by another instance of the same service, it is recommended that each application requests the same files periodically.
 
-This web API supports multiple repositories, each with its own root URI. Some repositories are installed by default, others can be defined by the user. The default repositories (and their directory path) are:
+This web API supports multiple repositories, each with its own root URI. Some repositories are installed by default, more can be created by the user (just create the directory in the depot repositories root). The default repositories (and their default directory paths) are:
 ```
-/depot/config (/var/lib/house/config)
-/depot/state (/var/lib/house/state)
-/depot/scripts (/var/lib/house/scripts)
+/depot/config (/var/lib/house/depot/config)
+/depot/state (/var/lib/house/depot/state)
+/depot/scripts (/var/lib/house/depot/scripts)
 ```
 
-The user can define his own repository /depot/*name* pointing to directory path *path* using the -repo=*name*:*path* command line argument. Multiple repositories can be defined by repeating the -repo option. For example:
+(Note: previous versions of HouseDepot used the default root /var/lib/house instead of /var/lib/house/depot. An upgrade will automatically move the defaults repositories to the new location. Any user created repository must be moved by hand.)
+
+The user may define his own repository root with the -root option. This option is mostly intended for testing. For example:
 ```
-housedepot -repo=userx:/var/lib/user/x -repo=userz:/var/lib/user/z
+housedepot -root=/home/smith/depot
 ```
-The housedepot service launched in the example above will accept revision controled files at /depot/userx and /depot/userz in addition to the default repositories.
+The housedepot service launched in the example above will retrieve the repositories by scanning /home/smith/depot.
+
+Per repository options can be specified by creating a `.options` file in thre repository top directory. This is an ASCII file where each line sets a specific option (name ' ' value). Only one option is supported at this time:
+* depth (numeric, the maximum number of revisions kept by HouseDepot--there is no limit if the option is not present or the value  is 0)
 
 No file or repository can be named "all". Character '~' is not allowed in file, repository or subdirectory names. Only alphabetical, numerical, '_' and '-' characters are allowed in tag names.
 
-The path of each file relative to its root directory matches the path used in the HTTP URL. For example `/depot/config/cabin/sprinkler.json` matches file `/var/lib/house/config/cabin/sprinkler.json`. However HouseDepot limits the depth to one subdirectory level only: attempts to create /depot/config/cabin/woods/sprinkler.json would be rejected.
+The path of each file relative to its root directory matches the path used in the HTTP URL. For example `/depot/config/cabin/sprinkler.json` matches file `/var/lib/house/depot/config/cabin/sprinkler.json`. However HouseDepot limits the depth of a repository to one subdirectory level only: attempts to create /depot/config/depot/cabin/woods/sprinkler.json would be rejected.
 
 ## Recommanded Practices
 
@@ -71,7 +76,7 @@ One of HouseDepot's goals is to facilitate moving services across a pool of comp
 
 A way to do this is to either have a single configuration file name across the network (for example if there is only one sprinkler controller active at any one time).
 
-Sometimes multiple separate configurations are necessary. In that case, one can define a configuration name (named group) that is distinct from the set of computer names. When the service is moved from one computer to the other, the only local configuration needed is to choose the proper group name. (This is named a group because it is expected that a complete system configuration will include multiple services working in concert, i.e. a group of services. A local network might run multiple instances of such groups.)
+Sometimes multiple separate configurations are necessary. In that case, one can define a configuration name (a.k.a. group), which should be distinct from the set of computer names. When the service is moved from one computer to the other, the only local configuration needed is to choose the proper group name. (This is named a group because it is expected that a complete system configuration will include multiple services working in concert, i.e. a group of services. A local network might run multiple instances of such groups.)
 
 However some services (e.g. HouseRelays or HouseSensor) depend on access to local hardware interfaces that are not present on other computers: in that case the recommended practice is to name the configuration based on the computer name.
 

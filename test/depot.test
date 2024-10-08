@@ -1,0 +1,64 @@
+GET http://localhost/depot/test/group1/testA.txt?revision=all
+PUT http://localhost/depot/test/group1/testA.txt
++ This is revision 1
+GET http://localhost/depot/test/group1/testA.txt
+GET http://localhost/depot/test/group1/testA.txt?revision=all
+PUT http://localhost/depot/test/group1/testA.txt
++ This is revision 2
+GET http://localhost/depot/test/group1/testA.txt
+GET http://localhost/depot/test/group1/testA.txt?revision=all
+GET http://localhost/depot/test/group1/testA.txt?revision=1
+POST http://localhost/depot/test/group1/testA.txt?revision=1&tag=original-file
++
+GET http://localhost/depot/test/group1/testA.txt?revision=all
+POST http://localhost/depot/test/group1/testA.txt?revision=1&tag=moving
++
+GET http://localhost/depot/test/group1/testA.txt?revision=all
+PUT http://localhost/depot/test/group1/testA.txt
++ This is revision 3
+GET http://localhost/depot/test/group1/testA.txt
+GET http://localhost/depot/test/group1/testA.txt?revision=all
+POST http://localhost/depot/test/group1/testA.txt?revision=2&tag=moving
++
+GET http://localhost/depot/test/group1/testA.txt?revision=all
+GET http://localhost/depot/test/group1/testA.txt?revision=moving
+POST http://localhost/depot/test/group1/testA.txt?revision=2&tag=current
++
+GET http://localhost/depot/test/group1/testA.txt?revision=all
+GET http://localhost/depot/test/group1/testA.txt
+PUT http://localhost/depot/test/group2/testB.txt
++ This is testB rev 1
+PUT http://localhost/depot/test/group2/testB.txt
++ This is testB rev 2
+PUT http://localhost/depot/test/group2/testB.txt
++ This is testB rev 3
+GET http://localhost/depot/test/group2/testB.txt?revision=all
+DELETE http://localhost/depot/test/group1/testA.txt?revision=1
+GET http://localhost/depot/test/group1/testA.txt?revision=all
+GET http://localhost/depot/test/group2/testB.txt?revision=all
+DELETE http://localhost/depot/test/group1/testA.txt?revision=moving
+GET http://localhost/depot/test/group1/testA.txt?revision=all
+GET http://localhost/depot/test/group2/testB.txt?revision=all
+PUT http://localhost/depot/test/group1/testA.txt
++ This is revision 4
+POST http://localhost/depot/test/group1/testA.txt?revision=3&tag=behind
++
+PUT http://localhost/depot/test/group1/testA.txt
++ This is revision 5
+PUT http://localhost/depot/test/group1/testA.txt
++ This is revision 5
+PUT http://localhost/depot/test/group1/testA.txt
++ This is revision 5 modified 6
+PUT http://localhost/depot/test/group1/testA.txt
++ This is revision 7
+GET http://localhost/depot/test/group1/testA.txt?revision=all
+POST http://localhost/depot/test/group1/testA.txt?revision=4&tag=recent
++
+POST http://localhost/depot/test/group1/testA.txt?revision=3&tag=older
++
+POST http://localhost/depot/test/group1/testA.txt?revision=2&tag=current
++
+GET http://localhost/depot/test/all
+GET http://localhost/depot/test/group1/all
+GET http://localhost/depot/test/group2/all
+

@@ -28,3 +28,6 @@ const char *housedepot_revision_list (const char *clientname,
 const char *housedepot_revision_history (const char *clientname,
                                          const char *filename);
 
+void housedepot_revision_prune (const char *clientname,
+                                const char *filename, int depth);
+

@@ -23,19 +23,18 @@
  * their change history.
  *
  * void housedepot_repository_initialize (const char *hostname,
- *                                        const char *portal);
+ *                                        const char *portal,
+ *                                        const char *parent);
  *
- *    Set the host and portal names and initialize the module's resources.
- *
- * void housedepot_repository_route (const char *uri, const char *path);
- *
- *    Initialize the module and its web API.
+ *    Set the host and portal names, initialize the module's resources and
+ *    initialize the context for each repository found.
  */
 
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -48,9 +47,10 @@
 #include "housedepot_revision.h"
 #include "housedepot_repository.h"
 
-#define DEBUG if (echttp_isdebug()) printf
+#define DEBUG if (housedepot_isdebug()) printf
 
 static echttp_catalog housedepot_repository_roots;
+static echttp_catalog housedepot_repository_depth;
 
 static echttp_catalog housedepot_repository_type;
 
@@ -191,11 +191,12 @@ static const char *housedepot_repository_page (const char *action,
     }
 
     if (!strcmp (action, "PUT")) {
-        snprintf (rooturi, sizeof(rooturi), "%s", filename);
-        char *subdir = strrchr (rooturi, '/');
+        char parent[1024];
+        snprintf (parent, sizeof(parent), "%s", filename);
+        char *subdir = strrchr (parent, '/');
         if (subdir) {
             *subdir = 0;
-            if (mkdir (rooturi, 0700) < 0) {
+            if (mkdir (parent, 0700) < 0) {
                 if (errno != EEXIST) {
                     echttp_error (500, "URI too deep");
                     return "";
@@ -204,11 +205,16 @@ static const char *housedepot_repository_page (const char *action,
         }
         time_t timestamp = 0;
         const char *timestampstring = echttp_parameter_get ("time");
-        if (timestampstring) timestamp = atol(timestampstring);
+        if (timestampstring) timestamp = atoll(timestampstring);
 
         error = housedepot_revision_checkin
                    (localuri, filename, timestamp, data, length);
         if (error) echttp_error (500, error);
+
+        const char *depth = echttp_catalog_get (&housedepot_repository_depth, rooturi);
+        if (depth) {
+           housedepot_revision_prune (localuri, filename, atoi(depth));
+        }
         return "";
     }
 
@@ -283,8 +289,26 @@ static const char *housedepot_repository_list (const char *action,
     return buffer;
 }
 
+static int housedepot_repository_route (const char *uri, const char *path) {
+
+    echttp_catalog_set (&housedepot_repository_roots, uri, path);
+    char options[256];
+    snprintf (options, sizeof(options), "%s/.options", path);
+    FILE *file = fopen (options, "r");
+    if (file) {
+       while (fgets (options, sizeof(options), file)) {
+          if (strstr (options, "depth ") == options) {
+             echttp_catalog_set (&housedepot_repository_depth, uri, strdup(options+6));
+          }
+       }
+       fclose (file);
+    }
+    return echttp_route_match (uri, housedepot_repository_page);
+}
+
 void housedepot_repository_initialize (const char *hostname,
-                                       const char *portal) {
+                                       const char *portal,
+                                       const char *parent) {
 
     static int Initialized = 0;
     if (!Initialized) {
@@ -298,13 +322,24 @@ void housedepot_repository_initialize (const char *hostname,
         housedepot_repository_host = hostname;
         housedepot_repository_portal = portal;
         echttp_route_uri ("/depot/all", housedepot_repository_list);
+
+        // Find out all the repositories and initialize them.
+        struct dirent **files = 0;
+        int n = scandir (parent, &files, 0, 0);
+        for (i = 0; i < n; i++) {
+           struct dirent *ent = files[i];
+           if (ent->d_name[0] == '.') continue; // Skip hidden entries.
+           if (ent->d_type != DT_DIR) continue; // Must be a directory.
+           char uri[256];
+           char path[256];
+           snprintf (uri, sizeof(uri), "/depot/%s", ent->d_name);
+           snprintf (path, sizeof(path), "%s/%s", parent, ent->d_name);
+           housedepot_repository_route (strdup(uri), strdup(path));
+           free (ent);
+        }
+        if (files) free (files);
         Initialized = 1;
     }
 }
 
-int housedepot_repository_route (const char *uri, const char *path) {
-
-    echttp_catalog_set (&housedepot_repository_roots, uri, path);
-    return echttp_route_match (uri, housedepot_repository_page);
-}
 

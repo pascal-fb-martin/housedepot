@@ -69,6 +69,7 @@
  *                                        const char *revision);
  * 
  *   Apply the specified tag name to the specified revision of the file.
+ *   This does nothing if the file revision does not exist.
  *   The tag is moved if it was already assigned to another revision.
  *   The tag is created if it did not exist yet.
  *
@@ -90,6 +91,22 @@
  *                                          const char *filename);
  *
  *   Return JSON data that describes the file history.
+ *
+ * void housedepot_revision_prune (const char *clientname,
+ *                                 const char *filename, int depth);
+ *
+ *   Remove older revisions of the specified file, leaving only the
+ *   most recent revisions up to the specified depth. The pruning
+ *   follow the delete restrictions: the latest and current revisions
+ *   cannot be pruned. If the depth value is less than 2, no revision is
+ *   removed. Nothing is done if there are no revisions older than depth.
+ *
+ *   For example, if depth is 3 and the current tag matches latest,
+ *   only the 3 most recent revisions will be left.
+ *
+ *   Warning: the depth check is based on the revision number,
+ *   not on the number of files. If depth is 3 but the 2nd most
+ *   recent revision was deleted, then only 2 revisions will be left.
  */
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -221,7 +238,7 @@ const char *housedepot_revision_checkin (const char *clientname,
     // (Increment latest.)
     //
     snprintf (link, sizeof(link), "%s%c%s", filename, FRM, "latest");
-    pathsz = readlink (link, fullname, sizeof(fullname));
+    pathsz = readlink (link, fullname, sizeof(fullname)-1);
     if (pathsz <= 0) {
         newrev = 1;
     } else {
@@ -297,6 +314,10 @@ static int housedepot_revision_resolve (const char *filename, const char *tag,
         if (pathsz <= 0) return 0;
         result[pathsz] = 0;
     }
+    // Check if the resolved name points to an existing file.
+    int fd = open (result, O_RDONLY);
+    if (fd < 0) return 0;
+    close(fd);
     return 1;
 }
 
@@ -375,12 +396,43 @@ static int housedepot_revision_compare (const struct dirent **a,
     return alphasort(a, b);
 }
 
+static int housedepot_revision_scanhistory (const char *filename,
+                                            struct dirent ***files) {
+
+    // Retrieve both the directory to scan and the file pattern to search.
+    //
+    static char dirname[1024];
+
+    snprintf (dirname, sizeof(dirname), "%s%c", filename, FRM);
+    scandir_pattern = strrchr (dirname, '/');
+    if (!scandir_pattern) return 0;
+    *(scandir_pattern++) = 0;
+    scandir_pattern_length = strlen(scandir_pattern);
+
+    int n = scandir (dirname, files, housedepot_revision_filter,
+                                     housedepot_revision_compare);
+    scandir_pattern = 0;
+    scandir_pattern_length = 0;
+    return n;
+}
+
 static void housedepot_revision_cleanscan (struct dirent **files, int n) {
     int i;
     for (i = 0; i < n; i++) {
         free (files[i]);
     }
-    free (files);
+    if (files) free (files);
+}
+
+static void housedepot_revision_getdir (const char *filename,
+                                        char *dirname, int size) {
+    snprintf (dirname, size, "%s", filename);
+    char *dirsep = strrchr (dirname, '/');
+    if (dirsep) *dirsep = 0;
+    else {
+        dirname[0] = '.';
+        dirname[1] = 0;
+    }
 }
 
 const char *housedepot_revision_delete (const char *clientname,
@@ -420,17 +472,10 @@ const char *housedepot_revision_delete (const char *clientname,
     // them first.
     // Retrieve both the directory to scan and the file pattern to search.
     //
-    struct dirent **files;
+    struct dirent **files = 0;
+    int n = housedepot_revision_scanhistory (filename, &files);
 
-    snprintf (working, sizeof(working), "%s%c", filename, FRM);
-    scandir_pattern = strrchr (working, '/');
-    if (!scandir_pattern) return 0;
-    *(scandir_pattern++) = 0;
-    scandir_pattern_length = strlen(scandir_pattern);
-
-    int n = scandir (working, &files, housedepot_revision_filter,
-                                      housedepot_revision_compare);
-    scandir_pattern = 0;
+    housedepot_revision_getdir (filename, working, sizeof(working));
 
     int i;
     for (i = 0; i < n; i++) {
@@ -475,7 +520,7 @@ const char *housedepot_revision_list (const char *clientname,
     static char buffer[16000];
 
     int i;
-    struct dirent **files;
+    struct dirent **files = 0;
 
     int cursor = snprintf (buffer, sizeof(buffer),
                            "{\"host\":\"%s\",\"timestamp\":%d",
@@ -498,7 +543,7 @@ const char *housedepot_revision_list (const char *clientname,
             { // This block is a workaround for errors with some GCC versions.
             // Support only one level of subdirectory (see README.md)
             int i2;
-            struct dirent **files2;
+            struct dirent **files2 = 0;
             static char subdir[1024];
             snprintf (subdir, sizeof(subdir), "%s/%s", dirname, ent->d_name);
             int n2 = scandir (subdir, &files2, 0, housedepot_revision_compare);
@@ -553,7 +598,7 @@ const char *housedepot_revision_list (const char *clientname,
         }
     }
     snprintf (buffer+cursor, sizeof(buffer)-cursor, "]}");
-    if (n > 0) housedepot_revision_cleanscan (files, n);
+    housedepot_revision_cleanscan (files, n);
 
     return buffer;
 }
@@ -565,19 +610,11 @@ const char *housedepot_revision_history (const char *clientname,
 
     int i;
     static char dirname[1024];
-    struct dirent **files;
+    struct dirent **files = 0;
 
-    // Retrieve both the directory to scan and the file pattern to search.
-    //
-    snprintf (dirname, sizeof(dirname), "%s%c", filename, FRM);
-    scandir_pattern = strrchr (dirname, '/');
-    if (!scandir_pattern) return 0;
-    *(scandir_pattern++) = 0;
-    scandir_pattern_length = strlen(scandir_pattern);
+    housedepot_revision_getdir (filename, dirname, sizeof(dirname));
 
-    int n = scandir (dirname, &files, housedepot_revision_filter,
-                                      housedepot_revision_compare);
-    scandir_pattern = 0;
+    int n = housedepot_revision_scanhistory (filename, &files);
 
     int cursor = snprintf (buffer, sizeof(buffer),
                            "{\"host\":\"%s\",\"timestamp\":%lld,\"file\":\"%s\"",
@@ -639,7 +676,48 @@ const char *housedepot_revision_history (const char *clientname,
     }
     snprintf (buffer+cursor, sizeof(buffer)-cursor, "]}");
 
-    if (n > 0) housedepot_revision_cleanscan (files, n);
+    housedepot_revision_cleanscan (files, n);
     return buffer;
+}
+
+void housedepot_revision_prune (const char *clientname,
+                                const char *filename, int depth) {
+
+    if (depth < 2) return; // Never prune that bad..
+
+    // Retrieve the latest revision, and then decide the most recent revision
+    // to delete.
+    //
+    char link[1024];
+    char fullname[1024];
+    snprintf (link, sizeof(link), "%s%c%s", filename, FRM, "latest");
+    int pathsz = readlink (link, fullname, sizeof(fullname)-1);
+    if (pathsz <= 0) return; // No revision found.
+    fullname[pathsz] = 0;
+    char *rev = strrchr (fullname, FRM);
+    if (!rev) return; // Invalid revision database? Don't touch..
+
+    int old = atoi (rev+1) - depth;
+    if (old < 1) return; // No revision is too old.
+
+    // Scan this folder to remove revisions that are too old.
+    //
+    struct dirent **files = 0;
+    int n = housedepot_revision_scanhistory (filename, &files);
+    int i;
+    for (i = 0; i < n; i++) {
+        struct dirent *ent = files[i];
+        const char *sep = strrchr (ent->d_name, FRM);
+        if (sep) {
+           if (isdigit(*(++sep))) {
+              if (atoi(sep) <= old) {
+                 housedepot_trace
+                    (HOUSE_INFO, filename, "PRUNE", filename, ent->d_name);
+                 housedepot_revision_delete (clientname, filename, sep);
+              }
+           }
+        }
+    }
+    housedepot_revision_cleanscan (files, n);
 }
 

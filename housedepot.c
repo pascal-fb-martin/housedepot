@@ -48,6 +48,12 @@
 
 static int use_houseportal = 0;
 
+static int Debug = 0;
+
+int housedepot_isdebug (void) {
+    return Debug;
+}
+
 static void housedepot_background (int fd, int mode) {
 
     static time_t LastRenewal = 0;
@@ -73,6 +79,7 @@ static void housedepot_protect (const char *method, const char *uri) {
 int main (int argc, const char **argv) {
 
     int i;
+    const char *root = "/var/lib/house/depot";
     const char *error;
 
     // These strange statements are to make sure that fds 0 to 2 are
@@ -96,28 +103,16 @@ int main (int argc, const char **argv) {
     echttp_cors_allow_method("GET");
     echttp_protect (0, housedepot_protect);
 
-    housedepot_revision_initialize (houselog_host(), houseportal_server());
-    housedepot_repository_initialize (houselog_host(), houseportal_server());
-
-    housedepot_repository_route ("/depot/config", "/var/lib/house/config");
-    housedepot_repository_route ("/depot/state", "/var/lib/house/state");
-    housedepot_repository_route ("/depot/scripts", "/var/lib/house/scripts");
-
     for (i = 1; i < argc; ++i) {
-        const char *map = echttp_option_match ("-repo=", argv[i], 0);
-        if (map) {
-            char uri[512];
-            char *path;
-            snprintf (uri, sizeof(uri), "/depot/%s", map);
-            path = strchr (uri, ':');
-            if (path) {
-                *(path++) = 0;
-                housedepot_repository_route (uri, path);
-                if (echttp_isdebug())
-                    printf ("Add repository %s -> %s\n", uri, path);
-            }
+        if (echttp_option_match ("-root=", argv[i], &root)) continue;
+        if (echttp_option_present ("-debug", argv[i])) {
+            Debug = 1;
+            continue;
         }
     }
+    housedepot_revision_initialize (houselog_host(), houseportal_server());
+    housedepot_repository_initialize
+       (houselog_host(), houseportal_server(), root);
 
     echttp_static_route ("/", "/usr/local/share/house/public");
     echttp_background (&housedepot_background);
