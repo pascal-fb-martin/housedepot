@@ -34,10 +34,10 @@ clean:
 rebuild: clean all
 
 %.o: %.c
-	gcc -c -g -O -o $@ $<
+	gcc -c -Os -o $@ $<
 
 housedepot: $(OBJS)
-	gcc -g -O -o housedepot $(OBJS) -lhouseportal -lechttp -lssl -lcrypto -lrt
+	gcc -Os -o housedepot $(OBJS) -lhouseportal -lechttp -lssl -lcrypto -lrt
 
 # Application installation. -------------------------------------
 
