@@ -31,3 +31,5 @@ const char *housedepot_revision_history (const char *clientname,
 void housedepot_revision_prune (const char *clientname,
                                 const char *filename, int depth);
 
+void housedepot_revision_repair (const char *dirname);
+

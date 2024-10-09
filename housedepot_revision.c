@@ -107,6 +107,14 @@
  *   Warning: the depth check is based on the revision number,
  *   not on the number of files. If depth is 3 but the 2nd most
  *   recent revision was deleted, then only 2 revisions will be left.
+ *
+ * void housedepot_revision_repair (const char *dirname);
+ *
+ *   This function "repairs" absolute path links into relative links.
+ *   Links inside a repository should always have been relative, since
+ *   they are targetting a file in the same directory. However an older
+ *   version created absolute links, causing a breakage if the repository
+ *   is moved, and thus the need for repair.
  */
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -184,9 +192,41 @@ int housedepot_revision_checkout (const char *filename,
     return open (fullname, O_RDONLY);
 }
 
+/* Create all links as relative, to the same directory.
+ * This matches the model of the depot repository and makes links
+ * independent from the actual repository location..
+ */
 static int housedepot_revision_link (const char *target, const char *link) {
     unlink (link);
-    return symlink(target, link);
+    char *relative = strdup (target);
+    char *base = strrchr (relative, '/');
+    base = base ? base + 1 : relative;
+    int result = symlink(base, link);
+    free (relative);
+    return result;
+}
+
+/* Read a link and return a target that uses an absolute path.
+ * If the target is relative, this means using the same absolute
+ * path as the link itself.
+ * This is done so because this module uses absolute paths
+ * all the way through.
+ */
+static int housedepot_revision_readlink (const char *link,
+                                         char *target, int size) {
+    char relative[1024];
+    int pathsz = readlink (link, relative, size-1);
+    if (pathsz <= 0) return pathsz;
+    relative[pathsz] = 0;
+    if ((link[0] != '/') || (relative[0] == '/')) {
+        snprintf (target, size, "%s", relative); // Not relative, after all.
+        return pathsz;
+    }
+    snprintf (target, size, "%s", link);
+    char *cursor = strrchr (target, '/');
+    if (!cursor) return 0;
+    int offset = (int) (cursor - target);
+    return offset + snprintf (target+offset, size-offset, "/%s", relative);
 }
 
 static int housedepot_revision_same (const char *filename,
@@ -238,11 +278,10 @@ const char *housedepot_revision_checkin (const char *clientname,
     // (Increment latest.)
     //
     snprintf (link, sizeof(link), "%s%c%s", filename, FRM, "latest");
-    pathsz = readlink (link, fullname, sizeof(fullname)-1);
+    pathsz = housedepot_revision_readlink (link, fullname, sizeof(fullname));
     if (pathsz <= 0) {
         newrev = 1;
     } else {
-        fullname[pathsz] = 0;
         housedepot_trace (HOUSE_INFO, filename, "FOUND", "latest", fullname);
         char *rev = strrchr (fullname, FRM);
         if (!rev) return "invalid revision database";
@@ -310,9 +349,8 @@ static int housedepot_revision_resolve (const char *filename, const char *tag,
     } else {
         char link[1024];
         snprintf (link, sizeof(link), "%s%c%s", result, FRM, tag);
-        int pathsz = readlink (link, result, size-1);
+        int pathsz = housedepot_revision_readlink (link, result, size);
         if (pathsz <= 0) return 0;
-        result[pathsz] = 0;
     }
     // Check if the resolved name points to an existing file.
     int fd = open (result, O_RDONLY);
@@ -483,9 +521,8 @@ const char *housedepot_revision_delete (const char *clientname,
             char link[1024];
             char target[1024];
             snprintf (link, sizeof(link), "%s/%s", working, files[i]->d_name);
-            int pathsz = readlink (link, target, sizeof(target)-1);
+            int pathsz = housedepot_revision_readlink (link, target, sizeof(target));
             if (pathsz <= 0) continue;
-            target[pathsz] = 0;
             char *targetsep = strrchr (target, FRM);
             if (targetsep) {
                 if (!strcmp (targetsep+1, revision)) {
@@ -540,7 +577,7 @@ const char *housedepot_revision_list (const char *clientname,
 
         switch (ent->d_type) {
         case DT_DIR:
-            { // This block is a workaround for errors with some GCC versions.
+            { // This block is required by gcc..
             // Support only one level of subdirectory (see README.md)
             int i2;
             struct dirent **files2 = 0;
@@ -557,9 +594,8 @@ const char *housedepot_revision_list (const char *clientname,
                 char target[1024];
                 snprintf (link, sizeof(link), "%s/%s/%s",
                           dirname, ent->d_name, ent2->d_name);
-                int pathsz = readlink (link, target, sizeof(target)-1);
+                int pathsz = housedepot_revision_readlink (link, target, sizeof(target));
                 if (pathsz <= 0) continue;
-                target[pathsz] = 0;
                 char *rev = strrchr(target, FRM);
                 if (!rev) continue;
                 struct stat fs;
@@ -579,9 +615,8 @@ const char *housedepot_revision_list (const char *clientname,
             char link[1024];
             char target[1024];
             snprintf (link, sizeof(link), "%s/%s", dirname, ent->d_name);
-            int pathsz = readlink (link, target, sizeof(target)-1);
+            int pathsz = housedepot_revision_readlink (link, target, sizeof(target));
             if (pathsz <= 0) break;
-            target[pathsz] = 0;
             char *rev = strrchr(target, FRM);
             if (!rev) break;
             struct stat fs;
@@ -691,9 +726,8 @@ void housedepot_revision_prune (const char *clientname,
     char link[1024];
     char fullname[1024];
     snprintf (link, sizeof(link), "%s%c%s", filename, FRM, "latest");
-    int pathsz = readlink (link, fullname, sizeof(fullname)-1);
+    int pathsz = housedepot_revision_readlink (link, fullname, sizeof(fullname));
     if (pathsz <= 0) return; // No revision found.
-    fullname[pathsz] = 0;
     char *rev = strrchr (fullname, FRM);
     if (!rev) return; // Invalid revision database? Don't touch..
 
@@ -716,6 +750,64 @@ void housedepot_revision_prune (const char *clientname,
                  housedepot_revision_delete (clientname, filename, sep);
               }
            }
+        }
+    }
+    housedepot_revision_cleanscan (files, n);
+}
+
+void housedepot_revision_repair (const char *dirname) {
+
+    int i;
+    struct dirent **files = 0;
+
+    int n = scandir (dirname, &files, 0, housedepot_revision_compare);
+
+    for (i = 0; i < n; i++) {
+        struct dirent *ent = files[i];
+        if (ent->d_name[0] == '.') continue; // Skip hidden files, . and ..
+
+        switch (ent->d_type) {
+        case DT_DIR:
+            { // This block is required by gcc..
+            // Support only one level of subdirectory (see README.md)
+            int i2;
+            struct dirent **files2 = 0;
+            static char subdir[1024];
+            snprintf (subdir, sizeof(subdir), "%s/%s", dirname, ent->d_name);
+            int n2 = scandir (subdir, &files2, 0, housedepot_revision_compare);
+            if (n2 <= 0) break;
+
+            for (i2 = 0; i2 < n2; i2++) {
+                struct dirent *ent2 = files2[i2];
+                if (ent2->d_type != DT_LNK) continue; // One directory level.
+                char link[1024];
+                char target[1024];
+                snprintf (link, sizeof(link), "%s/%s/%s",
+                          dirname, ent->d_name, ent2->d_name);
+                int pathsz = readlink (link, target, sizeof(target)-1);
+                if (pathsz <= 0) continue;
+                target[pathsz] = 0;
+                if (target[0] != '/') continue; // No repair needed.
+                housedepot_revision_link (target, link); // Repair as relative.
+            }
+            housedepot_revision_cleanscan (files2, n2);
+            }
+            break;
+
+        case DT_LNK:
+            char link[1024];
+            char target[1024];
+            snprintf (link, sizeof(link), "%s/%s", dirname, ent->d_name);
+            int pathsz = readlink (link, target, sizeof(target)-1);
+            if (pathsz <= 0) break;
+            target[pathsz] = 0;
+            if (target[0] != '/') break; // No repair needed.
+            housedepot_revision_link (target, link); // Repair as relative.
+            break;
+
+        default:
+            // Ignore actual files: no repair needed.
+            break;
         }
     }
     housedepot_revision_cleanscan (files, n);

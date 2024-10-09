@@ -336,6 +336,7 @@ void housedepot_repository_initialize (const char *hostname,
            snprintf (path, sizeof(path), "%s/%s", parent, ent->d_name);
            housedepot_repository_route (strdup(uri), strdup(path));
            free (ent);
+           housedepot_revision_repair (path);
         }
         if (files) free (files);
         Initialized = 1;
