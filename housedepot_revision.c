@@ -197,11 +197,17 @@ int housedepot_revision_checkout (const char *filename,
  * independent from the actual repository location..
  */
 static int housedepot_revision_link (const char *target, const char *link) {
-    unlink (link);
+    if (unlink (link)) {
+        houselog_trace (HOUSE_FAILURE, "LINK", "CANNOT REMOVE %s: %s", link, strerror(errno));
+        return -1;
+    }
     char *relative = strdup (target);
     char *base = strrchr (relative, '/');
     base = base ? base + 1 : relative;
     int result = symlink(base, link);
+    if (result) {
+        houselog_trace (HOUSE_FAILURE, "LINK", "CANNOT CREATE %s: %s", link, strerror(errno));
+    }
     free (relative);
     return result;
 }
@@ -301,8 +307,15 @@ const char *housedepot_revision_checkin (const char *clientname,
     snprintf (fullname, sizeof(fullname), "%s%c%d", filename, FRM, newrev);
     housedepot_trace (HOUSE_INFO, filename, "NEW", "REVISION", fullname);
     int fd = open (fullname, O_WRONLY|O_TRUNC|O_CREAT, 0644);
-    if (fd < 0) return "Cannot open for writing";
-    if (write (fd, data, length) != length) return "Cannot write the data";
+    if (fd < 0) {
+        houselog_trace (HOUSE_FAILURE, "FILE", "CANNOT CREATE REVISION %d: %s", newrev, strerror(errno));
+        return "Cannot open for writing";
+    }
+    if (write (fd, data, length) != length) {
+        houselog_trace (HOUSE_FAILURE, "FILE", "CANNOT WRITE REVISION %d: %s", newrev, strerror(errno));
+        close(fd);
+        return "Cannot write the data";
+    }
     close(fd);
 
     if (timestamp > 0) {
