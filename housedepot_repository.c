@@ -196,7 +196,7 @@ static const char *housedepot_repository_page (const char *action,
         char *subdir = strrchr (parent, '/');
         if (subdir) {
             *subdir = 0;
-            if (mkdir (parent, 0700) < 0) {
+            if (mkdir (parent, 0711) < 0) {
                 if (errno != EEXIST) {
                     echttp_error (500, "URI too deep");
                     return "";

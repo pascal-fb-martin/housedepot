@@ -198,8 +198,10 @@ int housedepot_revision_checkout (const char *filename,
  */
 static int housedepot_revision_link (const char *target, const char *link) {
     if (unlink (link)) {
-        houselog_trace (HOUSE_FAILURE, "LINK", "CANNOT REMOVE %s: %s", link, strerror(errno));
-        return -1;
+        if (errno != ENOENT) {
+            houselog_trace (HOUSE_FAILURE, "LINK", "CANNOT REMOVE %s: %s", link, strerror(errno));
+            return -1;
+        }
     }
     char *relative = strdup (target);
     char *base = strrchr (relative, '/');
