@@ -626,6 +626,7 @@ const char *housedepot_revision_list (const char *clientname,
             break;
 
         case DT_LNK:
+            { // This block is required by some versions of gcc..
             if (strchr(ent->d_name, FRM)) break; // Skip tag links.
             char link[1024];
             char target[1024];
@@ -640,6 +641,7 @@ const char *housedepot_revision_list (const char *clientname,
                                 "%s{\"name\":\"%s/%s\",\"rev\":\"%s\",\"time\":%lld}",
                                 sep, clientname, ent->d_name, rev+1, (long long)(fs.st_mtime));
             sep = ",";
+            }
             break;
 
         default:
@@ -783,7 +785,7 @@ void housedepot_revision_repair (const char *dirname) {
 
         switch (ent->d_type) {
         case DT_DIR:
-            { // This block is required by gcc..
+            { // This block is required by some versions of gcc..
             // Support only one level of subdirectory (see README.md)
             int i2;
             struct dirent **files2 = 0;
@@ -810,6 +812,7 @@ void housedepot_revision_repair (const char *dirname) {
             break;
 
         case DT_LNK:
+            { // This block is required by some versions of gcc..
             char link[1024];
             char target[1024];
             snprintf (link, sizeof(link), "%s/%s", dirname, ent->d_name);
@@ -818,6 +821,7 @@ void housedepot_revision_repair (const char *dirname) {
             target[pathsz] = 0;
             if (target[0] != '/') break; // No repair needed.
             housedepot_revision_link (target, link); // Repair as relative.
+            }
             break;
 
         default:
