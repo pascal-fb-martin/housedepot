@@ -267,6 +267,15 @@ static int housedepot_revision_same (const char *filename,
     return 1;
 }
 
+static void housedepot_revision_touch (const char *filename, time_t timestamp) {
+
+    if (timestamp > 0) {
+        struct utimbuf ut;
+        ut.actime = ut.modtime = timestamp;
+        utime (filename, &ut);
+    }
+}
+
 const char *housedepot_revision_checkin (const char *clientname,
                                          const char *filename,
                                          time_t      timestamp,
@@ -300,11 +309,12 @@ const char *housedepot_revision_checkin (const char *clientname,
         //
         if (housedepot_revision_same (fullname, data, length)) {
             housedepot_trace (HOUSE_INFO, filename, "DUPLICATES", rev+1, 0);
-            return 0; // Silently ignore this duplicate.
+            housedepot_revision_touch (fullname, timestamp);
+            return 0; // Silently ignore this duplicate otherwise.
         }
     }
 
-    // Create the (real) file.
+    // Create the new (real) file.
     //
     snprintf (fullname, sizeof(fullname), "%s%c%d", filename, FRM, newrev);
     housedepot_trace (HOUSE_INFO, filename, "NEW", "REVISION", fullname);
@@ -320,11 +330,7 @@ const char *housedepot_revision_checkin (const char *clientname,
     }
     close(fd);
 
-    if (timestamp > 0) {
-        struct utimbuf ut;
-        ut.actime = ut.modtime = timestamp;
-        utime (fullname, &ut);
-    }
+    housedepot_revision_touch (fullname, timestamp);
 
     // Set the standard tags as symbolic links: ~latest and ~current.
     //
