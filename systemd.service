@@ -1,8 +1,12 @@
 [Unit]
 Description=the house configuration repository
 After=network-online.target houseportal.service
+StartLimitIntervalSec=500
+StartLimitBurst=5
 
 [Service]
+Restart=on-failure
+RestartSec=50s
 EnvironmentFile=-/etc/default/housedepot
 EnvironmentFile=-/etc/sysconfig/housedepot
 ExecStart=/usr/local/bin/housedepot $OPTS
