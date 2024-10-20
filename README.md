@@ -92,12 +92,21 @@ All responses from the HouseDepot server contain the following standard entries:
 - .timestamp: the time of this response.
 
 ```
+GET /depot/check
+```
+
+Return a millisecond timestamp representing when the last change to any repository has occurred. This method allows for an efficient periodic polling of the service. The client should not use the returned timestamp for anything else than comparing it with a previous returned value. If the timestamp value has changed, regardless how, the client should query the repository content again.
+
+The response is a JSON structure with the following entries:
+- .updated: an integer representing the last repository update's timestamp.
+
+```
 GET /depot/all
 ```
 Return the list of all repositories present on this HouseDepot service.
 
 The response is a JSON structure with the following entries:
-- .repositories: an array of strings. Each strin is the root URI for one repository.
+- .repositories: an array of strings. Each string is the root URI for one repository.
 
 ```
 GET /depot/<path>/all

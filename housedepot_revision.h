@@ -33,3 +33,5 @@ void housedepot_revision_prune (const char *clientname,
 
 void housedepot_revision_repair (const char *dirname);
 
+long long housedepot_revision_get_update_timestamp (void);
+

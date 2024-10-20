@@ -247,7 +247,7 @@ static const char *housedepot_repository_page (const char *action,
     return "";
 }
 
-static char housedepot_repositories[1024];
+static char housedepot_repositories[65537];
 static int housedepot_repositories_cursor;
 static char *housedepot_repositories_sep;
 
@@ -289,6 +289,18 @@ static const char *housedepot_repository_list (const char *action,
     return buffer;
 }
 
+static const char *housedepot_repository_check (const char *action,
+                                                const char *uri,
+                                                const char *data, int length) {
+
+    snprintf (housedepot_repositories, sizeof(housedepot_repositories),
+              "{\"host\":\"%s\",\"timestamp\":%d,\"updated\":%lld}",
+              housedepot_repository_host, (int)time(0),
+              housedepot_revision_get_update_timestamp());
+    echttp_content_type_json();
+    return housedepot_repositories;
+}
+
 static int housedepot_repository_route (const char *uri, const char *path) {
 
     echttp_catalog_set (&housedepot_repository_roots, uri, path);
@@ -322,6 +334,7 @@ void housedepot_repository_initialize (const char *hostname,
         housedepot_repository_host = hostname;
         housedepot_repository_portal = portal;
         echttp_route_uri ("/depot/all", housedepot_repository_list);
+        echttp_route_uri ("/depot/check", housedepot_repository_check);
 
         // Find out all the repositories and initialize them.
         struct dirent **files = 0;

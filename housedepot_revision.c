@@ -54,7 +54,7 @@
  * int housedepot_revision_checkout (const char *filename,
  *                                   const char *revision);
  *
- *   Checkout the specified revision and make this revision the "current" one.
+ *   Checkout the specified revision (or "current" if revision is null).
  *
  * const char *housedepot_revision_checkin (const char *clientname,
  *                                          const char *filename,
@@ -115,9 +115,15 @@
  *   they are targetting a file in the same directory. However an older
  *   version created absolute links, causing a breakage if the repository
  *   is moved, and thus the need for repair.
+ *
+ * long long housedepot_revision_get_update_timestamp (void);
+ *
+ *   Return a millisecond timestamp representing the last time any of
+ *   the repository has been modified.
  */
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <utime.h>
@@ -141,6 +147,20 @@ static const char *housedepot_revision_portal;
 
 static char housedepot_valid_revision[256] = {0};
 
+long long housedepot_revision_updated = 0;
+
+static void housedepot_revision_set_update_timestamp (void) {
+
+    struct timeval now;
+    gettimeofday (&now, 0);
+
+    housedepot_revision_updated = (now.tv_sec * 1000) + (now.tv_usec / 1000);
+}
+
+long long housedepot_revision_get_update_timestamp (void) {
+    return housedepot_revision_updated;
+}
+
 void housedepot_revision_initialize (const char *host, const char *portal) {
 
     housedepot_revision_host = host;
@@ -154,6 +174,8 @@ void housedepot_revision_initialize (const char *host, const char *portal) {
     housedepot_valid_revision['.'] = 1;
     housedepot_valid_revision['_'] = 1;
     housedepot_valid_revision['-'] = 1;
+
+    housedepot_revision_set_update_timestamp ();
 }
 
 static int housedepot_revision_isvalid (const char *revision) {
@@ -326,6 +348,7 @@ const char *housedepot_revision_checkin (const char *clientname,
     if (write (fd, data, length) != length) {
         houselog_trace (HOUSE_FAILURE, "FILE", "CANNOT WRITE REVISION %d: %s", newrev, strerror(errno));
         close(fd);
+        unlink (fullname); // Leave the repository consistent.
         return "Cannot write the data";
     }
     close(fd);
@@ -348,6 +371,7 @@ const char *housedepot_revision_checkin (const char *clientname,
 
     houselog_event ("FILE", clientname, "CHECKED IN", "REVISION %d", newrev);
 
+    housedepot_revision_set_update_timestamp ();
     return 0;
 }
 
@@ -413,6 +437,7 @@ const char *housedepot_revision_apply (const char *tag,
     houselog_event ("FILE", clientname, "APPLIED",
                     "TAG %s TO REVISION %s", tag, realrev+1);
 
+    housedepot_revision_set_update_timestamp ();
     return 0;
 }
 
@@ -569,6 +594,7 @@ const char *housedepot_revision_delete (const char *clientname,
     if (!realrev) realrev = "~(invalid)"; // Thou shall not crash.
     houselog_event ("FILE", clientname, "DELETED", "REVISION %s", realrev+1);
 
+    housedepot_revision_set_update_timestamp ();
     return 0;
 }
 

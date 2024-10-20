@@ -4,6 +4,7 @@
 <link rel=stylesheet type="text/css" href="/house.css" title="House">
 <script>
 
+var CurrentDepotTimestamp = 0;
 var CurrentDepotFileUri = false;
 
 function newFileLink (target, text) {
@@ -194,6 +195,25 @@ function depotRefresh () {
     if (CurrentDepotFileUri) depotGetHistory (CurrentDepotFileUri);
     window.scrollTo(x, y);
 }
+
+function depotCompare (response) {
+    if (CurrentDepotTimestamp != response.updated) {
+        CurrentDepotTimestamp = response.updated;
+        depotRefresh();
+    }
+}
+
+function depotCheck () {
+    var command = new XMLHttpRequest();
+    command.open("GET", "/depot/check");
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            depotCompare (JSON.parse(command.responseText));
+        }
+    }
+    command.send(null);
+}
+
 window.onload = function() {
 
    function depotShowRepositories (response) {
@@ -225,7 +245,7 @@ window.onload = function() {
    }
    depotRepositories();
 
-   setInterval (depotRefresh, 1000);
+   setInterval (depotCheck, 1000);
 };
 </script>
 <head>
