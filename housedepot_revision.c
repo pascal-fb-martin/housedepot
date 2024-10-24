@@ -154,7 +154,7 @@ static void housedepot_revision_set_update_timestamp (void) {
     struct timeval now;
     gettimeofday (&now, 0);
 
-    housedepot_revision_updated = (now.tv_sec * 1000) + (now.tv_usec / 1000);
+    housedepot_revision_updated = ((long long)now.tv_sec * 1000) + (now.tv_usec / 1000);
 }
 
 long long housedepot_revision_get_update_timestamp (void) {
