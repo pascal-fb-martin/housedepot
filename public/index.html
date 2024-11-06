@@ -223,8 +223,9 @@ window.onload = function() {
          document.getElementById('portal').href = 'http://'+response.proxy+'/index.html';
       }
       var repobox = document.getElementById ('repo');
-      for (var i = 0; i < response.repositories.length; i++) {
-           var name = response.repositories[i];
+      var repositories = response.repositories.sort();
+      for (var i = 0; i < repositories.length; i++) {
+           var name = repositories[i];
            var item = document.createElement("option");
            item.setAttribute("value", name);
            item.appendChild(document.createTextNode(name));
