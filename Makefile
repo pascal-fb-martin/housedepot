@@ -41,18 +41,20 @@ housedepot: $(OBJS)
 
 # Application installation. -------------------------------------
 
-install-app:
+install-ui:
+	mkdir -p $(SHARE)/public/depot
+	chmod 755 $(SHARE) $(SHARE)/public $(SHARE)/public/depot
+	cp public/* $(SHARE)/public/depot
+	chown root:root $(SHARE)/public/depot/*
+	chmod 644 $(SHARE)/public/depot/*
+
+install-app: install-ui
 	mkdir -p $(HROOT)/bin
 	mkdir -p /etc/house
 	rm -f $(HROOT)/bin/housedepot
 	cp housedepot $(HROOT)/bin
 	chown root:root $(HROOT)/bin/housedepot
 	chmod 755 $(HROOT)/bin/housedepot
-	mkdir -p $(SHARE)/public/depot
-	chmod 755 $(SHARE) $(SHARE)/public $(SHARE)/public/depot
-	cp public/* $(SHARE)/public/depot
-	chown root:root $(SHARE)/public/depot/*
-	chmod 644 $(SHARE)/public/depot/*
 	touch /etc/default/housedepot
 	mkdir -p /var/lib/house/depot
 	if [ -d /var/lib/house/config ] ; then tar cf backupconfig.tar /var/lib/house/config ; mv /var/lib/house/config /var/lib/house/depot ; fi
