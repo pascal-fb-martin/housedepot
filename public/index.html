@@ -219,9 +219,6 @@ window.onload = function() {
    function depotShowRepositories (response) {
       var title = response.host+' - Depot';
       document.getElementsByTagName ('title')[0].innerHTML = title;
-      if (response.proxy) {
-         document.getElementById('portal').href = 'http://'+response.proxy+'/index.html';
-      }
       var repobox = document.getElementById ('repo');
       var repositories = response.repositories.sort();
       for (var i = 0; i < repositories.length; i++) {
