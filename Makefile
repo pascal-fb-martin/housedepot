@@ -57,6 +57,7 @@ install-app: install-ui
 	chmod 755 $(HROOT)/bin/housedepot
 	touch /etc/default/housedepot
 	mkdir -p /var/lib/house/depot
+	grep -q '^house:' /etc/passwd && chmod -R house:house /var/lib/house/depot
 	if [ -d /var/lib/house/config ] ; then tar cf backupconfig.tar /var/lib/house/config ; mv /var/lib/house/config /var/lib/house/depot ; fi
 	if [ -d /var/lib/house/state ] ; then tar cf backupstate.tar /var/lib/house/state ; mv /var/lib/house/state /var/lib/house/depot ; fi
 	if [ -d /var/lib/house/scripts ] ; then tar cf backupscripts.tar /var/lib/house/scripts ; mv /var/lib/house/scripts /var/lib/house/depot ; fi

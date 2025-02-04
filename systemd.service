@@ -5,6 +5,7 @@ StartLimitIntervalSec=500
 StartLimitBurst=5
 
 [Service]
+User=house
 Restart=on-failure
 RestartSec=50s
 EnvironmentFile=-/etc/default/housedepot
