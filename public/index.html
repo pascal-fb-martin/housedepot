@@ -65,7 +65,8 @@ function depotDelete () {
     command.open("DELETE", uri+'?revision='+this.depotRev);
     command.onreadystatechange = function () {
         if (command.readyState === 4 && command.status === 200) {
-            depotGetHistory (uri);
+            if (CurrentDepotFileUri == uri) CurrentDepotFileUri = false;
+            depotRefresh ();
         }
     }
     command.send(null);
@@ -166,6 +167,8 @@ function depotShowFiles (repository, response) {
         var inner = document.createElement("td");
         inner.appendChild
             (newFileAction("History", depotHistory, file.name));
+        inner.appendChild
+            (newFileAction("Delete", depotDelete, file.name, "all"));
         outer.appendChild(inner);
         filelist.appendChild(outer);
     }
@@ -193,6 +196,7 @@ function depotRefresh () {
     var y = window.scrollY;
     depotGetFiles(document.getElementById ('repo'));
     if (CurrentDepotFileUri) depotGetHistory (CurrentDepotFileUri);
+    else depotHideHistory();
     window.scrollTo(x, y);
 }
 

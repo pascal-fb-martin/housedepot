@@ -81,6 +81,9 @@
  *   user defined tags that link to that revision. This fails and nothing is
  *   deleted if the revision is referenced by a predefined tag.
  *
+ *   The special revision name "all" cause the complete deletion of all
+ *   revisions and tags for the specified file.
+ *
  * const char *housedepot_revision_list (const char *clientname,
  *                                       const char *dirname);
  *
@@ -441,6 +444,7 @@ const char *housedepot_revision_apply (const char *tag,
     return 0;
 }
 
+static char *scandir_exact = 0;
 static char *scandir_pattern = 0;
 static int scandir_pattern_length = 0;
 
@@ -519,6 +523,53 @@ static void housedepot_revision_getdir (const char *filename,
     }
 }
 
+static int housedepot_revision_purgefilter (const struct dirent *e) {
+    if (!scandir_exact) return 1; // Should never happen, avoid crash.
+    if (!strcmp (e->d_name, scandir_exact)) return 1;
+    return housedepot_revision_filter (e);
+}
+
+static int housedepot_revision_purgecompare (const struct dirent **a,
+                                             const struct dirent **b) {
+    return 0; // We do not care about order when purging.
+}
+
+const char *housedepot_revision_purge (const char *clientname,
+                                       const char *filename) {
+
+    static char dirname[1024];
+    static char pattern[1024];
+
+    struct dirent **files = 0;
+
+    snprintf (dirname, sizeof(dirname), "%s", filename);
+    scandir_exact = strrchr (dirname, '/');
+    if (!scandir_exact) return "invalid name";
+    *(scandir_exact++) = 0;
+
+    snprintf (pattern, sizeof(pattern), "%s%c", scandir_exact, FRM);
+    scandir_pattern = pattern;
+    scandir_pattern_length = strlen(scandir_pattern);
+
+    int n = scandir (dirname, &files, housedepot_revision_purgefilter,
+                                      housedepot_revision_purgecompare);
+
+    int i;
+    for (i = 0; i < n; i++) {
+        char fullname[2048];
+        snprintf (fullname, sizeof(fullname),
+                  "%s/%s", dirname, files[i]->d_name);
+        unlink (fullname);
+    }
+
+    scandir_exact = 0;
+    scandir_pattern = 0;
+    scandir_pattern_length = 0;
+    housedepot_revision_cleanscan (files, n);
+    if (n <= 0) return "no such file";
+    return 0;
+}
+
 const char *housedepot_revision_delete (const char *clientname,
                                         const char *filename,
                                         const char *revision) {
@@ -533,6 +584,8 @@ const char *housedepot_revision_delete (const char *clientname,
         // This operation is about deleting a tag.
         if (!strcmp(revision, "current")) return "Cannot delete current";
         if (!strcmp(revision, "latest")) return "Cannot delete latest";
+        if (!strcmp(revision, "all"))
+            return housedepot_revision_purge (clientname, filename);
         unlink (fullname);
         houselog_event ("FILE", clientname, "REMOVED", "TAG %s", revision);
         return 0;
