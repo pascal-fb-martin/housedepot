@@ -123,6 +123,7 @@ GET /depot/<name>/...?revision=<tag>
 Retrieve the current revision of the specified file. If a `revision` parameter is present, the specified revision is retrieved. The tag may be a file revision number or a user-assigned name associated with one file revision.
 
 Three tag names are reserved:
+
 - `latest` represents the most recent revision, which might not be the same as current.
 - `current` represents the current revision, i.e. `revision=current` behaves the same as if there was no revision parameter
 - `all` causes the request to return an history of the file instead of its content.
@@ -132,6 +133,7 @@ A file history is a json object that contains the name of the server, a timestam
 Each tag definitions is an array with 2 entries: the tag name and the revision number.
 
 Each revision entry is an object with the following entries:
+
 - .time: an ASCII representation of the revision (PUT) date and time
 - .rev: the file's numeric revision number.
 
