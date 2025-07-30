@@ -1,6 +1,6 @@
 # HouseDepot - a log and ressource file storage service.
 #
-# Copyright 2023, Pascal Martin
+# Copyright 2025, Pascal Martin
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,10 +16,17 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor,
 # Boston, MA  02110-1301, USA.
+#
+# WARNING
+#
+# This Makefile depends on echttp and houseportal (dev) being installed.
+
+prefix=/usr/local
+SHARE=$(prefix)/share/house
+
+INSTALL=/usr/bin/install
 
 HAPP=housedepot
-HROOT=/usr/local
-SHARE=$(HROOT)/share/house
 
 # Application build. --------------------------------------------
 
@@ -41,37 +48,26 @@ housedepot: $(OBJS)
 
 # Application installation. -------------------------------------
 
-install-ui:
-	mkdir -p $(SHARE)/public/depot
-	chmod 755 $(SHARE) $(SHARE)/public $(SHARE)/public/depot
-	cp public/* $(SHARE)/public/depot
-	chown root:root $(SHARE)/public/depot/*
-	chmod 644 $(SHARE)/public/depot/*
+install-ui: install-preamble
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(SHARE)/public/depot
+	$(INSTALL) -m 0644 public/* $(DESTDIR)$(SHARE)/public/depot
 
 install-app: install-ui
-	mkdir -p $(HROOT)/bin
-	mkdir -p /etc/house
-	rm -f $(HROOT)/bin/housedepot
-	cp housedepot $(HROOT)/bin
-	chown root:root $(HROOT)/bin/housedepot
-	chmod 755 $(HROOT)/bin/housedepot
-	touch /etc/default/housedepot
-	mkdir -p /var/lib/house/depot
-	grep -q '^house:' /etc/passwd && chown -R house:house /var/lib/house/depot
-	if [ -d /var/lib/house/config ] ; then tar cf backupconfig.tar /var/lib/house/config ; mv /var/lib/house/config /var/lib/house/depot ; fi
-	if [ -d /var/lib/house/state ] ; then tar cf backupstate.tar /var/lib/house/state ; mv /var/lib/house/state /var/lib/house/depot ; fi
-	if [ -d /var/lib/house/scripts ] ; then tar cf backupscripts.tar /var/lib/house/scripts ; mv /var/lib/house/scripts /var/lib/house/depot ; fi
-	mkdir -p /var/lib/house/depot/config /var/lib/house/depot/state /var/lib/house/depot/scripts
-	chmod 755 /var/lib/house/depot/config /var/lib/house/depot/state /var/lib/house/depot/scripts
+	$(INSTALL) -m 0755 -s housedepot $(DESTDIR)$(prefix)/bin
+	touch $(DESTDIR)/etc/default/housedepot
+	$(INSTALL) -m 0755 -d $(DESTDIR)/var/lib/house/depot/config
+	$(INSTALL) -m 0755 -d $(DESTDIR)/var/lib/house/depot/state
+	$(INSTALL) -m 0755 -d $(DESTDIR)/var/lib/house/depot/scripts
+	if [ "x$(DESTDIR)" = "x" ] ; then grep -q '^house:' /etc/passwd && chown -R house:house /var/lib/house/depot ; fi
 
 uninstall-app:
-	rm -rf $(SHARE)/public/depot
-	rm -f $(HROOT)/bin/housedepot
+	rm -rf $(DESTDIR)$(SHARE)/public/depot
+	rm -f $(DESTDIR)$(prefix)/bin/housedepot
 
 purge-app:
 
 purge-config:
-	rm -rf /etc/default/housedepot
+	rm -rf $(DESTDIR)/etc/default/housedepot
 
 # System installation. ------------------------------------------
 
