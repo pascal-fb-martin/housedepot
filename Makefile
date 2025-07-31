@@ -44,7 +44,7 @@ rebuild: clean all
 	gcc -c -Os -o $@ $<
 
 housedepot: $(OBJS)
-	gcc -Os -o housedepot $(OBJS) -lhouseportal -lechttp -lssl -lcrypto -lrt
+	gcc -Os -o housedepot $(OBJS) -lhouseportal -lechttp -lssl -lcrypto -lmagic -lrt
 
 # Application installation. -------------------------------------
 
