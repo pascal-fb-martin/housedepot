@@ -52,13 +52,15 @@ install-ui: install-preamble
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(SHARE)/public/depot
 	$(INSTALL) -m 0644 public/* $(DESTDIR)$(SHARE)/public/depot
 
-install-app: install-ui
+install-runtime: install-preamble
 	$(INSTALL) -m 0755 -s housedepot $(DESTDIR)$(prefix)/bin
 	touch $(DESTDIR)/etc/default/housedepot
 	$(INSTALL) -m 0755 -d $(DESTDIR)/var/lib/house/depot/config
 	$(INSTALL) -m 0755 -d $(DESTDIR)/var/lib/house/depot/state
 	$(INSTALL) -m 0755 -d $(DESTDIR)/var/lib/house/depot/scripts
 	if [ "x$(DESTDIR)" = "x" ] ; then grep -q '^house:' /etc/passwd && chown -R house:house /var/lib/house/depot ; fi
+
+install-app: install-ui install-runtime
 
 uninstall-app:
 	rm -rf $(DESTDIR)$(SHARE)/public/depot
@@ -68,6 +70,22 @@ purge-app:
 
 purge-config:
 	rm -rf $(DESTDIR)/etc/default/housedepot
+
+# Build a private Debian package. -------------------------------
+
+install-package: install-ui install-runtime install-systemd
+
+debian-package:
+	rm -rf build
+	install -m 0755 -d build/$(HAPP)/DEBIAN
+	cat debian/control | sed "s/{{arch}}/`dpkg --print-architecture`/" > build/$(HAPP)/DEBIAN/control
+	install -m 0644 debian/copyright build/$(HAPP)/DEBIAN
+	install -m 0644 debian/changelog build/$(HAPP)/DEBIAN
+	install -m 0755 debian/postinst build/$(HAPP)/DEBIAN
+	install -m 0755 debian/prerm build/$(HAPP)/DEBIAN
+	install -m 0755 debian/postrm build/$(HAPP)/DEBIAN
+	make DESTDIR=build/$(HAPP) install-package
+	cd build ; fakeroot dpkg-deb -b $(HAPP) .
 
 # System installation. ------------------------------------------
 

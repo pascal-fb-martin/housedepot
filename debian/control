@@ -1,0 +1,23 @@
+Source: housedepot
+Version: 1.0
+Section: Web servers
+Maintainer: Pascal Martin <pascal.fb.martin@gmail.com>
+Priority: optional
+Homepage: https://github.com/pascal-fb-martin/housedepot
+Standard-Version: 4.7.0
+Package: housedepot
+Architecture: {{arch}}
+Depends: 
+Description: A House service to serve configurations and resource files
+ HouseDepot is part of the House suite of web services.
+ .
+ HouseDepot stores configuration and script files on behalf of the other
+ House services. The purpose is to consolidate configuration management
+ so that migrating a service from one server to another is pointless.
+ It is also convenient for Raspberry Pi upgrades, which sometime require
+ a complete new installation: the newly (re)installed services recover
+ their configurations from the depot serive automatically.
+ .
+ HouseDepot should be installed on a file server. Sd cards and emmc storages
+ can wear out quickly if not cautious.
+
