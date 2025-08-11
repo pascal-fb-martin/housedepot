@@ -5,6 +5,7 @@ HAPP=housedepot
 case $1 in
     configure|abort-upgrade|abort-deconfigure|abort-remove)
         grep -q '^house:' /etc/passwd || useradd -r house -s /usr/sbin/nologin -d /var/lib/house
+        chown -R house:house /var/lib/house/depot
         systemctl daemon-reload
         if systemctl is-active --quiet $HAPP ; then
             systemctl restart $HAPP
