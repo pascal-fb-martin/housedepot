@@ -1,6 +1,9 @@
 # HouseDepot
+
 A House web service to maintain configurations, scripts and other resource files.
+
 ## Overview
+
 This is a web server application that stores files for other services, so that services can access their configuration independently of the computer they currently run on.
 
 That application also provides a central point through which all configuration files can be accessed and updated, facilitating the deployement of configurations when there is a fair number of computers involved (e.g. five or six Raspberry Pi computers).
@@ -49,18 +52,21 @@ An application is normally concerned only with doing GET of the current version 
 Since a file may be modified by another instance of the same service, it is recommended that each application requests the same files periodically.
 
 This web API supports multiple repositories, each with its own root URI. Some repositories are installed by default, more can be created by the user (just create the directory in the depot repositories root). The default repositories (and their default directory paths) are:
+
 ```
 /depot/config (/var/lib/house/depot/config)
 /depot/state (/var/lib/house/depot/state)
 /depot/scripts (/var/lib/house/depot/scripts)
 ```
 
-(Note: previous versions of HouseDepot used the default root /var/lib/house instead of /var/lib/house/depot. An upgrade will automatically move the defaults repositories to the new location. Any user created repository must be moved by hand.)
+(Previous versions of HouseDepot used the default root /var/lib/house instead of /var/lib/house/depot. An upgrade will automatically move the defaults repositories to the new location. Any user created repository must be moved by hand.)
 
 The user may define his own repository root with the -root option. This option is mostly intended for testing. For example:
+
 ```
 housedepot -root=/home/smith/depot
 ```
+
 The housedepot service launched in the example above will retrieve the repositories by scanning /home/smith/depot.
 
 Per repository options can be specified by creating a `.options` file in thre repository top directory. This is an ASCII file where each line sets a specific option (name ' ' value). Only one option is supported at this time:
@@ -87,6 +93,7 @@ The allowance for one level of directory is intended to support this recommended
 ## Web API
 
 All responses from the HouseDepot server contain the following standard entries:
+
 - .host: the name of the host that replied.
 - .proxy: if present, the name of the HousePortal proxy to use.
 - .timestamp: the time of this response.
@@ -103,23 +110,28 @@ The response is a JSON structure with the following entries:
 ```
 GET /depot/all
 ```
+
 Return the list of all repositories present on this HouseDepot service.
 
 The response is a JSON structure with the following entries:
+
 - .repositories: an array of strings. Each string is the root URI for one repository.
 
 ```
 GET /depot/<path>/all
 ```
+
 Return the list of all files present in the specified repository, or repository's subdirectory, with their current revision and date (i.e. the revision and file for the current version).
 
 The response is a JSON structure with the following entries:
+
 - .files: an array of JSON structure items. Each item represent one file with the following elements: .name, .rev and .time.
 
 ```
 GET /depot/<name>/...
 GET /depot/<name>/...?revision=<tag>
 ```
+
 Retrieve the current revision of the specified file. If a `revision` parameter is present, the specified revision is retrieved. The tag may be a file revision number or a user-assigned name associated with one file revision.
 
 Three tag names are reserved:
@@ -142,6 +154,7 @@ The arrays have no specified order. The historical order of revisions can be rec
 ```
 PUT /depot/<name>/...[?time=<timestamp>]
 ```
+
 Store a new revision of the specified file. That revision becomes the current version of that file. Note that there is no revision's comment: this service is not intended to compete with Git..
 
 The file may not exist, in which case it is created. The optional time parameter forces the file revision's timestamp to the specified value.
@@ -151,6 +164,7 @@ POST /depot/<name>/...?revision=<tag>
 POST /depot/<name>/...?revision=<tag>&tag=<name>
 POST /depot/<name>/...?tag=<name>
 ```
+
 Assign a tag to the specified revision. If the `tag` parameter is not specified. this request assigns the `current` tag to the specified version. If the `tag` parameter is specified, this request assigns the specified tag to the specified revision and the `current` tag is not touched, unless the name of the tag is `current`. If the version is not specified, `current` is assumed.
 
 The definition of tag is the same as for the GET method except that using name `all` is not allowed.
@@ -160,6 +174,7 @@ The file must exist.
 ```
 DELETE /depot/<name>/...?revision=<tag>
 ```
+
 Delete the specified tag or revision. If the revision parameter refers to a user defined tag, only the tag is removed. If the revision parameter refers to an actual revision number, this revision's file is deleted as well as all user-defined tags that refer to it.
 
 It is not allowed to delete a predefined tag, or a revision that a predefined tag refers to.
@@ -182,6 +197,7 @@ The provided Makefile supports building private Debian packages. These are _not_
   no source package.
 
 To build a Debian package, use the `debian-package` target:
+
 ```
 make debian-package
 ```
