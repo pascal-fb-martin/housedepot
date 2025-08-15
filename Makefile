@@ -27,8 +27,7 @@ SHARE=$(prefix)/share/house
 INSTALL=/usr/bin/install
 
 HAPP=housedepot
-HMAN=/var/lib/house/note/content/manuals/infrastructure
-HMANCACHE=/var/lib/house/note/cache
+HCAT=infrastructure
 
 # Application build. --------------------------------------------
 
@@ -53,9 +52,6 @@ housedepot: $(OBJS)
 install-ui: install-preamble
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(SHARE)/public/depot
 	$(INSTALL) -m 0644 public/* $(DESTDIR)$(SHARE)/public/depot
-	$(INSTALL) -m 0755 -d $(DESTDIR)$(HMAN)
-	$(INSTALL) -m 0644 README.md $(DESTDIR)$(HMAN)/$(HAPP).md
-	rm -rf $(DESTDIR)$(HMANCACHE)/*
 
 install-runtime: install-preamble
 	$(INSTALL) -m 0755 -s housedepot $(DESTDIR)$(prefix)/bin
@@ -70,8 +66,6 @@ install-app: install-ui install-runtime
 uninstall-app:
 	rm -rf $(DESTDIR)$(SHARE)/public/depot
 	rm -f $(DESTDIR)$(prefix)/bin/housedepot
-	rm -f $(DESTDIR)$(HMAN)/$(HAPP).md
-	rm -rf $(DESTDIR)$(HMANCACHE)/*
 
 purge-app:
 
