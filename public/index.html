@@ -38,12 +38,16 @@ function newFileAction (text, command, uri, rev, disabled) {
     return button;
 }
 
-function depotHideHistory () {
-    var revlist = document.getElementById ('history');
-    var children = revlist.childNodes;
-    for (var i = children.length-1; i >= 0; i--) {
-        if (children[i].depotRemoveMe) revlist.removeChild(children[i]);
+function depotCleanTable (id) {
+    var table = document.getElementById (id);
+    for (var i = table.rows.length-1; i > 0; i--) {
+        table.deleteRow(i);
     }
+    return table;
+}
+
+function depotHideHistory () {
+    depotCleanTable ('history');
     var label = document.getElementById ('hisfile');
     label.innerHTML = "";
 }
@@ -101,8 +105,7 @@ function depotShowHistory (response) {
     var revlist = document.getElementById ('history');
     for (i = response.history.length-1; i >= 0; i--) {
         var file = response.history[i];
-        var outer = document.createElement("tr");
-        outer.depotRemoveMe = true;
+        var outer = revlist.insertRow();
         var timestamp = new Date(file.time * 1000);
         outer.appendChild
             (newFileLink(response.file+'?revision='+file.rev,timestamp.toLocaleString()));
@@ -138,7 +141,6 @@ function depotShowHistory (response) {
         inner.appendChild
             (newFileAction("Delete", depotDelete, response.file, file.rev, isprotected));
         outer.appendChild(inner);
-        revlist.appendChild(outer);
     }
     var label = document.getElementById ('hisfile');
     label.innerHTML = response.file;
@@ -150,16 +152,11 @@ function depotHistory () {
 }
 
 function depotShowFiles (repository, response) {
-    var filelist = document.getElementById ('files');
-    var children = filelist.childNodes;
-    for (var i = children.length-1; i >= 0; i--) {
-        if (children[i].depotRemoveMe) filelist.removeChild(children[i]);
-    }
+    var filelist = depotCleanTable ('files');
     for (var i = 0; i < response.files.length; i++) {
         var file = response.files[i];
         var timestamp = new Date(file.time * 1000);
-        var outer = document.createElement("tr");
-        outer.depotRemoveMe = true;
+        var outer = filelist.insertRow();
         var basename = file.name.substring(repository.length+1);
         outer.appendChild(newFileLink(file.name, basename));
         outer.appendChild(newFileColumn(file.rev));
@@ -170,7 +167,6 @@ function depotShowFiles (repository, response) {
         inner.appendChild
             (newFileAction("Delete", depotDelete, file.name, "all"));
         outer.appendChild(inner);
-        filelist.appendChild(outer);
     }
 }
 
