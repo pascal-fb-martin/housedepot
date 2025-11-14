@@ -249,16 +249,15 @@ window.onload = function() {
    <title>Depot</title>
 </head>
 <body>
-   <table class="housetopcontainer">
-   <tr><td>
-   <table class="housetop">
+   <header>
+   <table>
    <tr>
    <td><span>Depot</span></td>
    <td><a href="/depot/events.html">Events</a></td>
    </tr>
    </table>
-   </td></tr>
-   </table>
+   </header>
+   <section>
    <br>
    <label for="repo" class="houselabel">Repository:</label>
    <select name="repo" id="repo" onChange="depotRepository(this)">
@@ -284,6 +283,7 @@ window.onload = function() {
          <th width="40%">ACTIONS</th>
       </tr>
    </table>
+   </section>
 </body>
 </html>
 
