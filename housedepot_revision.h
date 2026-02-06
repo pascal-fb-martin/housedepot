@@ -9,7 +9,7 @@ void housedepot_revision_initialize (const char *host,
                                      const char *portal,
                                      int argc, const char *argv[]);
 
-int housedepot_revision_authority (const char *group);
+int housedepot_revision_visible (const char *group);
 
 int housedepot_revision_checkout (const char *filename,
                                   const char *revision);

@@ -58,9 +58,9 @@
  *
  *   Provides the context to report when formatting responses.
  *
- * int housedepot_revision_authority (const char *group);
+ * int housedepot_revision_visible (const char *group);
  *
- *   Return 1 if this service has authority over the named group.
+ *   Return 1 if this service should list the named group.
  *
  * int housedepot_revision_checkout (const char *filename,
  *                                   const char *revision);
@@ -155,10 +155,12 @@
 
 #include "housedepot_revision.h"
 
-// The list of groups for which this service is authoritative.
-#define DEPOTAUTHORITYMAX 256
-static char *DepotAuthorityGroups[DEPOTAUTHORITYMAX];
-static int   DepotAuthorityGroupsCount = 0;
+// The list of groups that this service must make visible (or not)
+#define DEPOTVISIBILITYMAX 256
+static char *DepotVisibilityGroups[DEPOTVISIBILITYMAX];
+static int   DepotVisibilityMatch[DEPOTVISIBILITYMAX];
+static int   DepotVisibilityGroupsCount = 0;
+static int   DepotVisibilityGroupsExclude = 0; // 0: whitelist, 1: blacklist.
 
 #define FRM '~'
 
@@ -181,14 +183,37 @@ long long housedepot_revision_get_update_timestamp (void) {
     return housedepot_revision_updated;
 }
 
+static void housedepot_revision_adjust_match (void) {
+
+    int i;
+    for (i = 0; i < DepotVisibilityGroupsCount; ++i) {
+       int l = strlen (DepotVisibilityGroups[i]);
+       if (*(DepotVisibilityGroups[i] + l - 1) == '.')
+           DepotVisibilityMatch[i] = l - 1; // Match prefix only.
+       else
+           DepotVisibilityMatch[i] = 0; // Full length match.
+    }
+}
+
 void housedepot_revision_default (const char *arg) {
 
     const char *value;
 
-    int count = echttp_option_csv("-authority=", arg,
-                                  DepotAuthorityGroups, DEPOTAUTHORITYMAX);
+    int count = echttp_option_csv("-whitelist=", arg,
+                                  DepotVisibilityGroups, DEPOTVISIBILITYMAX);
     if (count > 0) {
-        DepotAuthorityGroupsCount = count;
+        DepotVisibilityGroupsCount = count;
+        DepotVisibilityGroupsExclude = 0;
+        housedepot_revision_adjust_match ();
+        return;
+    }
+
+    count = echttp_option_csv("-blacklist=", arg,
+                              DepotVisibilityGroups, DEPOTVISIBILITYMAX);
+    if (count > 0) {
+        DepotVisibilityGroupsCount = count;
+        DepotVisibilityGroupsExclude = 1;
+        housedepot_revision_adjust_match ();
         return;
     }
 }
@@ -686,15 +711,27 @@ const char *housedepot_revision_delete (const char *clientname,
     return 0;
 }
 
-int housedepot_revision_authority (const char *group) {
+int housedepot_revision_visible (const char *group) {
 
-    if (DepotAuthorityGroupsCount <= 0) return 1; // No filter.
+    if (DepotVisibilityGroupsCount <= 0) return 1; // No filter, so OK.
+
+    // These variables are meant to make the logic more readable.
+    // Whitelist (exclude == 0): visible (1) if found.
+    // Blacklist (exclude == 1): visible (1) if not found.
+    int found = 1 - DepotVisibilityGroupsExclude;
+    int notfound = DepotVisibilityGroupsExclude;
 
     int i;
-    for (i = 0; i < DepotAuthorityGroupsCount; ++i) {
-        if (!strcasecmp (DepotAuthorityGroups[i], group)) return 1; // OK.
+    for (i = 0; i < DepotVisibilityGroupsCount; ++i) {
+        if (DepotVisibilityMatch[i] > 0) {
+            if (!strncasecmp (group,
+                              DepotVisibilityGroups[i],
+                              DepotVisibilityMatch[i])) return found;
+        } else {
+            if (!strcasecmp (group, DepotVisibilityGroups[i])) return found;
+        }
     }
-    return 0; // Matches none of the specified filters.
+    return notfound;
 }
 
 const char *housedepot_revision_list (const char *clientname,
@@ -727,7 +764,7 @@ const char *housedepot_revision_list (const char *clientname,
 
             // Do not list any file outside of the defined authoritative groups
             // (may save them as backup).
-            if (!housedepot_revision_authority (ent->d_name)) continue;
+            if (!housedepot_revision_visible (ent->d_name)) continue;
 
             // Support only one level of subdirectory (see README.md)
             int i2;

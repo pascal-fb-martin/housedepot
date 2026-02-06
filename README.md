@@ -43,6 +43,8 @@ Access to HouseDepot is not restricted: this service should only be accessible f
 
 ## Files and Repositories
 
+### File revision history
+
 A revision controled file is simply a unique URL path that can be both retrieved and stored by the applications. HouseDepot silently records the history of every change.
 
 A revision controled file can be any ASCII or UTF-8 text format.
@@ -50,6 +52,8 @@ A revision controled file can be any ASCII or UTF-8 text format.
 An application is normally concerned only with doing GET of the current version and PUT of any subsequent update. It is the intent of the design that any file history management will be implemented as a web UI to HouseDepot. This way history management functions do not need to be duplicated across services.
 
 Since a file may be modified by another instance of the same service, it is recommended that each application requests the same files periodically.
+
+### Repositories
 
 This web API supports multiple repositories, each with its own root URI. Some repositories are installed by default, more can be created by the user (just create the directory in the depot repositories root). The default repositories (and their default directory paths) are:
 
@@ -60,8 +64,6 @@ This web API supports multiple repositories, each with its own root URI. Some re
 ```
 
 (Previous versions of HouseDepot used the default root /var/lib/house instead of /var/lib/house/depot. An upgrade will automatically move the defaults repositories to the new location. Any user created repository must be moved by hand.)
-
-Files within each repository can be created in the repository's directory, or in a subdirectory matching a group or host name (recommended). The use of group names makes it possible to maintain multiple sets of configurations within the same HouseDepot service. The use of host name makes it possible to maintain hardware-specific configurations. (A group name is a name provided through the `-group` option. House client services will automatically look for files based on their current group or host--depending on the application.)
 
 The user may define his own repository root with the -root option. This option is mostly intended for testing. For example:
 
@@ -78,27 +80,46 @@ No file or repository can be named "all". Character '~' is not allowed in file, 
 
 The path of each file relative to its root directory matches the path used in the HTTP URL. For example `/depot/config/cabin/sprinkler.json` matches file `/var/lib/house/depot/config/cabin/sprinkler.json`. However HouseDepot limits the depth of a repository to one subdirectory level only: attempts to create /depot/config/depot/cabin/woods/sprinkler.json would be rejected.
 
-The user may restrict the list of reported files to only those matching a list of groups using the -authority option. This option takes a comma-separated list of groups. For example:
+### Groups
+
+Files within each repository can be created in the repository's directory, or in a subdirectory matching a group or host name (recommended). The use of group names makes it possible to maintain multiple sets of configurations within the same HouseDepot service. The use of host name makes it possible to maintain hardware-specific configurations. (A group name is a name provided through the `-group` option. House client services will automatically look for files based on their current group or host--depending on the application.)
+
+The user may restrict the list of reported files using two options: a group white list (option `-whitelist`) or a group black list (option `-blacklist`). A white list defines which groups are visible (all other groups are hidden), while a black list defines which groups are hidden (all other groups are visible). You must use one option and you cannot combine both lists. If both options are used, the last one takees precedence. These options take a comma-separated list of groups as their value. For example:
 
 ```
-housedepot -authority=test,unittest
+housedepot -whitelist=test,unittest
 ```
 
-That option prevents the HouseDepot service from reporting files that are not within these groups. However the service still accept PUT requests for any file. This can be used to run multiple HouseDepot services without these competing with each other. Since each service accepts any checkin (PUT requests), they operate as backups of each other: if one server fails, just extend the list of groups in the `-authority` argument.
+or
+
+```
+housedepot -blacklist=test,unittest
+```
+
+If the name of one group ends with a '.', that name is only a prefix. For example "test." will match "testlight" or "testsprinkler". (Character '*' was not used because it clashes with shell syntax.)
+
+These two options together make is possible to split the configuration database into separate sets, managed by separate services. However a service still accepts PUT requests (aka checkin) for any file, regardless of the options used. Multiple HouseDepot services can then run simultaneously without competing with each other, all the while operating as backups to each other: if one server fails, just adjust the list of groups in another service.
+
+Another intent is to solve the traveling computers conundrum. Some applications that I am working on are meant to control a model railroad layout. You want the ability to get out and show the system at meet-ups. If the control system is dependent on a centralized configuration repository at home, getting it out (then back in) becomes labor intensive. A solution is to have a separate (local) repository that coexists with the central home one, but can perform autonomously as well.
+
+> [!NOTE]
+> An alternative solution would be using local configuration files. My model railroad control system is however made of a handful of computers, all but one being Raspberry Pi Zero units. A locally centralized configuration repository is convenient, especially when considering that the recommended Raspberry Pi OS upgrade process has become "format a new SD card from scratch". You want to keep as little personal data files on that SD card as possible.
 
 ## Recommanded Practices
 
 One of HouseDepot's goals is to facilitate moving services across a pool of computers and avoid leaving multiple (out of date) copies of their configuration lingering around.
 
-A way to do this is to either have a single configuration file name across the network (for example if there is only one sprinkler controller active at any one time).
+A way to do this is to either have a single configuration file across the network (for example if there is only one sprinkler controller active at any one time).
 
 Sometimes multiple separate configurations are necessary. In that case, one can define a configuration name (a.k.a. group), which should be distinct from the set of computer names. When the service is moved from one computer to the other, the only local configuration needed is to choose the proper group name. (This is named a group because it is expected that a complete system configuration will include multiple services working in concert, i.e. a group of services. A local network might run multiple instances of such groups.)
 
-However some services (e.g. HouseRelays or HouseSensor) depend on access to local hardware interfaces that are not present on other computers: in that case the recommended practice is to name the configuration based on the computer name.
+However some services (e.g. HouseRelays or HouseSensor) depend on access to local hardware interfaces that are not present on other computers: in that case the recommended practice is to use the computer name as a group.
 
-In order to keep the purpose of each configuration file clear, it is recommended for the configuration path to retain the ID of the service it is related to. A configuration file name would then incorporate two parts: a group or computer name and a service name.
+In order to keep the purpose of each configuration file clear, it is recommended for the configuration file name to match the ID of the service it is related to. A configuration file path would then incorporate two parts: a group or computer name and a service name.
 
 The allowance for one level of directory is intended to support this recommended organization: use the group or computer name as a subdirectory name, and keep the configuration file's base name matching the service ID.
+
+The whitelist and blacklist options are intended to complement each other. The specific benefit of using a blacklist is that it leaves the list of visible groups open: you do not need to update the services configuration whenever a new group or new host name is used. The recommended usage is to set a blacklist for the main (i.e. default) repository service, and a whitelist for each specialized repository services. The combined whitelists should match the blacklist. If the group and host names follow consistent conventions that match the intended purpose, using prefixes can help make these two lists very flexible. For example a list with only "rail." may well be enough to represent both the group and host names used for a model railroad control system.
 
 ## Web API
 
