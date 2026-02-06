@@ -146,6 +146,7 @@ static const char *housedepot_repository_page (const char *action,
         if (path) break;
         char *sep = strrchr (rooturi+1, '/');
         if (sep == 0) break;
+        if (!housedepot_revision_authority (sep+1)) break; // Pretend not found
         *sep = 0;
     }
     if (path == 0) {

@@ -103,7 +103,8 @@ int main (int argc, const char **argv) {
             continue;
         }
     }
-    housedepot_revision_initialize (houselog_host(), houseportal_server());
+    housedepot_revision_initialize
+       (houselog_host(), houseportal_server(), argc, argv);
     housedepot_repository_initialize
        (houselog_host(), houseportal_server(), root);
 

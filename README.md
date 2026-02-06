@@ -61,6 +61,8 @@ This web API supports multiple repositories, each with its own root URI. Some re
 
 (Previous versions of HouseDepot used the default root /var/lib/house instead of /var/lib/house/depot. An upgrade will automatically move the defaults repositories to the new location. Any user created repository must be moved by hand.)
 
+Files within each repository can be created in the repository's directory, or in a subdirectory matching a group or host name (recommended). The use of group names makes it possible to maintain multiple sets of configurations within the same HouseDepot service. The use of host name makes it possible to maintain hardware-specific configurations. (A group name is a name provided through the `-group` option. House client services will automatically look for files based on their current group or host--depending on the application.)
+
 The user may define his own repository root with the -root option. This option is mostly intended for testing. For example:
 
 ```
@@ -75,6 +77,14 @@ Per repository options can be specified by creating a `.options` file in thre re
 No file or repository can be named "all". Character '~' is not allowed in file, repository or subdirectory names. Only alphabetical, numerical, '_' and '-' characters are allowed in tag names.
 
 The path of each file relative to its root directory matches the path used in the HTTP URL. For example `/depot/config/cabin/sprinkler.json` matches file `/var/lib/house/depot/config/cabin/sprinkler.json`. However HouseDepot limits the depth of a repository to one subdirectory level only: attempts to create /depot/config/depot/cabin/woods/sprinkler.json would be rejected.
+
+The user may restrict the list of reported files to only those matching a list of groups using the -authority option. This option takes a comma-separated list of groups. For example:
+
+```
+housedepot -authority=test,unittest
+```
+
+That option prevents the HouseDepot service from reporting files that are not within these groups. However the service still accept PUT requests for any file. This can be used to run multiple HouseDepot services without these competing with each other. Since each service accepts any checkin (PUT requests), they operate as backups of each other: if one server fails, just extend the list of groups in the `-authority` argument.
 
 ## Recommanded Practices
 

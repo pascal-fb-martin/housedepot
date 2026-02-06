@@ -47,9 +47,20 @@
  *
  * SYNOPSYS
  *
- * void housedepot_revision_initialize (const char *host, const char *portal);
+ * void housedepot_revision_default (const char *arg);
+ *
+ *   Set a default value for one command line option. Must be called
+ *   before housedepot_revision_initialize().
+ *
+ * void housedepot_revision_initialize (const char *host,
+ *                                      const char *portal,
+ *                                      int argc, const char *argv[]);
  *
  *   Provides the context to report when formatting responses.
+ *
+ * int housedepot_revision_authority (const char *group);
+ *
+ *   Return 1 if this service has authority over the named group.
  *
  * int housedepot_revision_checkout (const char *filename,
  *                                   const char *revision);
@@ -139,9 +150,15 @@
 #include <strings.h>
 #include <dirent.h>
 
+#include <echttp.h>
 #include <houselog.h>
 
 #include "housedepot_revision.h"
+
+// The list of groups for which this service is authoritative.
+#define DEPOTAUTHORITYMAX 256
+static char *DepotAuthorityGroups[DEPOTAUTHORITYMAX];
+static int   DepotAuthorityGroupsCount = 0;
 
 #define FRM '~'
 
@@ -164,13 +181,31 @@ long long housedepot_revision_get_update_timestamp (void) {
     return housedepot_revision_updated;
 }
 
-void housedepot_revision_initialize (const char *host, const char *portal) {
+void housedepot_revision_default (const char *arg) {
+
+    const char *value;
+
+    int count = echttp_option_csv("-authority=", arg,
+                                  DepotAuthorityGroups, DEPOTAUTHORITYMAX);
+    if (count > 0) {
+        DepotAuthorityGroupsCount = count;
+        return;
+    }
+}
+
+void housedepot_revision_initialize (const char *host,
+                                     const char *portal,
+                                     int argc, const char *argv[]) {
+
+    int i;
+    for (i = 1; i < argc; ++i) {
+        housedepot_revision_default (argv[i]);
+    }
 
     housedepot_revision_host = host;
     housedepot_revision_portal = portal;
 
     // Precalculate which characters are valid in a revision or tag:
-    int i;
     for (i = 0; i < 128; i++) {
         if (isalnum(i)) housedepot_valid_revision[i] = 1;
     }
@@ -651,6 +686,17 @@ const char *housedepot_revision_delete (const char *clientname,
     return 0;
 }
 
+int housedepot_revision_authority (const char *group) {
+
+    if (DepotAuthorityGroupsCount <= 0) return 1; // No filter.
+
+    int i;
+    for (i = 0; i < DepotAuthorityGroupsCount; ++i) {
+        if (!strcasecmp (DepotAuthorityGroups[i], group)) return 1; // OK.
+    }
+    return 0; // Matches none of the specified filters.
+}
+
 const char *housedepot_revision_list (const char *clientname,
                                       const char *dirname) {
 
@@ -678,6 +724,11 @@ const char *housedepot_revision_list (const char *clientname,
         switch (ent->d_type) {
         case DT_DIR:
             { // This block is required by gcc..
+
+            // Do not list any file outside of the defined authoritative groups
+            // (may save them as backup).
+            if (!housedepot_revision_authority (ent->d_name)) continue;
+
             // Support only one level of subdirectory (see README.md)
             int i2;
             struct dirent **files2 = 0;
@@ -690,6 +741,9 @@ const char *housedepot_revision_list (const char *clientname,
                 struct dirent *ent2 = files2[i2];
                 if (ent2->d_type != DT_LNK) continue; // One directory level.
                 if (strchr(ent2->d_name, FRM)) continue; // Skip tag links.
+
+                // This is a symbolic link to a current revision: retrieve
+                // the revision number by following the link.
                 char link[1024];
                 char target[1024];
                 snprintf (link, sizeof(link), "%s/%s/%s",
