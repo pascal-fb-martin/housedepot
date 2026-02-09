@@ -197,8 +197,6 @@ static void housedepot_revision_adjust_match (void) {
 
 void housedepot_revision_default (const char *arg) {
 
-    const char *value;
-
     int count = echttp_option_csv("-whitelist=", arg,
                                   DepotVisibilityGroups, DEPOTVISIBILITYMAX);
     if (count > 0) {
@@ -677,7 +675,7 @@ const char *housedepot_revision_delete (const char *clientname,
     int i;
     for (i = 0; i < n; i++) {
         if (files[i]->d_type == DT_LNK) {
-            char link[1024];
+            char link[1300];
             char target[1024];
             snprintf (link, sizeof(link), "%s/%s", working, files[i]->d_name);
             int pathsz = housedepot_revision_readlink (link, target, sizeof(target));
@@ -752,7 +750,6 @@ const char *housedepot_revision_list (const char *clientname,
 
     int n = scandir (dirname, &files, 0, housedepot_revision_compare);
     const char *sep = "";
-    int tags = 1;
 
     for (i = 0; i < n; i++) {
         struct dirent *ent = files[i];
@@ -885,7 +882,7 @@ const char *housedepot_revision_history (const char *clientname,
             }
             const char *ver = strrchr(ent->d_name, FRM);
             if (ver) {
-                char fullname[1024];
+                char fullname[1300];
                 struct stat filestat;
                 snprintf (fullname, sizeof(fullname),
                           "%s/%s", dirname, ent->d_name);

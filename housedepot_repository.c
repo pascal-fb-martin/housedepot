@@ -181,7 +181,6 @@ static const char *housedepot_repository_page (const char *action,
             }
             return data;
         }
-        int size;
         int fd = housedepot_revision_checkout (filename, revision);
         return housedepot_repository_transfer (fd, filename, revision);
     }
@@ -344,8 +343,8 @@ void housedepot_repository_initialize (const char *hostname,
            struct dirent *ent = files[i];
            if (ent->d_name[0] == '.') continue; // Skip hidden entries.
            if (ent->d_type != DT_DIR) continue; // Must be a directory.
-           char uri[256];
-           char path[256];
+           char uri[300];
+           char path[350];
            snprintf (uri, sizeof(uri), "/depot/%s", ent->d_name);
            snprintf (path, sizeof(path), "%s/%s", parent, ent->d_name);
            housedepot_repository_route (strdup(uri), strdup(path));

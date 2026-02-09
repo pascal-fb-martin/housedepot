@@ -72,7 +72,6 @@ int main (int argc, const char **argv) {
 
     int i;
     const char *root = "/var/lib/house/depot";
-    const char *error;
 
     // These strange statements are to make sure that fds 0 to 2 are
     // reserved, since this application might output some errors.
