@@ -81,7 +81,7 @@ static const char *housedepot_repository_transfer (int fd,
                                                    const char *revision) {
 
     if (fd < 0) {
-        echttp_error (404, "Not found");
+        echttp_error (404, "File not found");
         return "";
     }
     struct stat fileinfo;
@@ -181,7 +181,7 @@ static const char *housedepot_repository_page (const char *action,
             echttp_content_type_json();
             const char *data = housedepot_revision_history (localuri, filename);
             if (!data) {
-                echttp_error (404, "Not found");
+                echttp_error (404, "No files");
                 return "";
             }
             return data;
