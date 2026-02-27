@@ -140,17 +140,18 @@ static const char *housedepot_repository_page (const char *action,
     }
 
     snprintf(rooturi, sizeof(rooturi), "%s", localuri);
+    int visible = 0;
     for(;;) {
         DEBUG ("Searching static map for %s\n", rooturi);
         path = echttp_catalog_get (&housedepot_repository_roots, rooturi);
         if (path) break;
         char *sep = strrchr (rooturi+1, '/');
         if (sep == 0) break;
-        if (!housedepot_revision_visible (sep+1)) break; // Pretend not found
+        if (housedepot_revision_visible (sep+1)) visible = 1;
         *sep = 0;
     }
     if (path == 0) {
-        echttp_error (404, "Path not found"); // Should never happen, but.
+        echttp_error (404, "Path not found");
         return "";
     }
     DEBUG ("found match for %s: %s\n", rooturi, path);
@@ -166,6 +167,10 @@ static const char *housedepot_repository_page (const char *action,
     const char *revision = echttp_parameter_get ("revision");
 
     if (!strcmp (action, "GET")) {
+        if (!visible) {
+            echttp_error (404, "Path not visible");
+            return "";
+        }
         if (is_all) {
             echttp_content_type_json();
             return housedepot_revision_list (localuri, filename);
