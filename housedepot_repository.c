@@ -167,13 +167,13 @@ static const char *housedepot_repository_page (const char *action,
     const char *revision = echttp_parameter_get ("revision");
 
     if (!strcmp (action, "GET")) {
-        if (!visible) {
-            echttp_error (404, "Path not visible");
-            return "";
-        }
         if (is_all) {
             echttp_content_type_json();
             return housedepot_revision_list (localuri, filename);
+        }
+        if (!visible) {
+            echttp_error (404, "Path not visible");
+            return "";
         }
         if (!revision)
             revision = "current";
