@@ -306,14 +306,14 @@ static int housedepot_revision_link (const char *target, const char *link) {
 static int housedepot_revision_readlink (const char *link,
                                          char *target, int size) {
     char relative[1024];
-    int pathsz = readlink (link, relative, size-1);
+    int pathsz = readlink (link, relative, sizeof(relative)-1);
     if (pathsz <= 0) return pathsz;
     relative[pathsz] = 0;
     if ((link[0] != '/') || (relative[0] == '/')) {
-        snprintf (target, size, "%s", relative); // Not relative, after all.
+        memccpy (target, relative, 0, size); // Not relative, after all.
         return pathsz;
     }
-    snprintf (target, size, "%s", link);
+    memccpy (target, link, 0, size);
     char *cursor = strrchr (target, '/');
     if (!cursor) return 0;
     int offset = (int) (cursor - target);
@@ -443,7 +443,7 @@ static int housedepot_revision_resolve (const char *filename, const char *tag,
 
     // Eliminate any existing revision/tag suffix.
     //
-    snprintf (result, size, "%s", filename);
+    memccpy (result, filename, 0, size);
     char *sep = strrchr (result, FRM);
     if (sep) *sep = 0;
 
@@ -572,7 +572,7 @@ static void housedepot_revision_cleanscan (struct dirent **files, int n) {
 
 static void housedepot_revision_getdir (const char *filename,
                                         char *dirname, int size) {
-    snprintf (dirname, size, "%s", filename);
+    memccpy (dirname, filename, 0, size);
     char *dirsep = strrchr (dirname, '/');
     if (dirsep) *dirsep = 0;
     else {
@@ -600,7 +600,7 @@ const char *housedepot_revision_purge (const char *clientname,
 
     struct dirent **files = 0;
 
-    snprintf (dirname, sizeof(dirname), "%s", filename);
+    memccpy (dirname, filename, 0, sizeof(dirname));
     scandir_exact = strrchr (dirname, '/');
     if (!scandir_exact) return "invalid name";
     *(scandir_exact++) = 0;

@@ -43,6 +43,7 @@
 #include "echttp.h"
 #include "echttp_static.h"
 #include "echttp_catalog.h"
+#include "echttp_libc.h"
 
 #include "housedepot_revision.h"
 #include "housedepot_repository.h"
@@ -128,7 +129,7 @@ static const char *housedepot_repository_page (const char *action,
         return "";
     }
 
-    snprintf(localuri, sizeof(localuri), "%s", uri); // Make a writable copy.
+    memccpy(localuri, uri, 0, sizeof(localuri)); // Make a writable copy.
 
     // Detect the /all terminator and consume it.
     //
@@ -139,7 +140,7 @@ static const char *housedepot_repository_page (const char *action,
         DEBUG ("List request for %s\n", localuri);
     }
 
-    snprintf(rooturi, sizeof(rooturi), "%s", localuri);
+    memccpy(rooturi, localuri, 0, sizeof(rooturi));
     int visible = 0;
     for(;;) {
         DEBUG ("Searching static map for %s\n", rooturi);
@@ -161,8 +162,9 @@ static const char *housedepot_repository_page (const char *action,
         echttp_error (500, "Buffer overflow"); // Should never happen, but.
         return "";
     }
-    snprintf (filename, sizeof(filename),
-              "%s%s", path, localuri+strlen(rooturi));
+    char *end = filename + sizeof(filename);
+    char *p = stpecpy (filename, end, path);
+    stpecpy (p, end, localuri+strlen(rooturi));
 
     const char *revision = echttp_parameter_get ("revision");
 
@@ -197,7 +199,7 @@ static const char *housedepot_repository_page (const char *action,
 
     if (!strcmp (action, "PUT")) {
         char parent[1024];
-        snprintf (parent, sizeof(parent), "%s", filename);
+        memccpy (parent, filename, 0, sizeof(parent));
         char *subdir = strrchr (parent, '/');
         if (subdir) {
             *subdir = 0;
