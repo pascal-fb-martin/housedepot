@@ -129,7 +129,7 @@ static const char *housedepot_repository_page (const char *action,
         return "";
     }
 
-    memccpy(localuri, uri, 0, sizeof(localuri)); // Make a writable copy.
+    strtcpy(localuri, uri, sizeof(localuri)); // Make a writable copy.
 
     // Detect the /all terminator and consume it.
     //
@@ -140,7 +140,7 @@ static const char *housedepot_repository_page (const char *action,
         DEBUG ("List request for %s\n", localuri);
     }
 
-    memccpy(rooturi, localuri, 0, sizeof(rooturi));
+    strtcpy(rooturi, localuri, sizeof(rooturi));
     int visible = 0;
     for(;;) {
         DEBUG ("Searching static map for %s\n", rooturi);
@@ -199,7 +199,7 @@ static const char *housedepot_repository_page (const char *action,
 
     if (!strcmp (action, "PUT")) {
         char parent[1024];
-        memccpy (parent, filename, 0, sizeof(parent));
+        strtcpy (parent, filename, sizeof(parent));
         char *subdir = strrchr (parent, '/');
         if (subdir) {
             *subdir = 0;

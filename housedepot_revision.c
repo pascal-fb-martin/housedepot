@@ -151,6 +151,8 @@
 #include <dirent.h>
 
 #include <echttp.h>
+#include "echttp_libc.h"
+
 #include <houselog.h>
 
 #include "housedepot_revision.h"
@@ -310,10 +312,10 @@ static int housedepot_revision_readlink (const char *link,
     if (pathsz <= 0) return pathsz;
     relative[pathsz] = 0;
     if ((link[0] != '/') || (relative[0] == '/')) {
-        memccpy (target, relative, 0, size); // Not relative, after all.
+        strtcpy (target, relative, size); // Not relative, after all.
         return pathsz;
     }
-    memccpy (target, link, 0, size);
+    strtcpy (target, link, size);
     char *cursor = strrchr (target, '/');
     if (!cursor) return 0;
     int offset = (int) (cursor - target);
@@ -443,7 +445,7 @@ static int housedepot_revision_resolve (const char *filename, const char *tag,
 
     // Eliminate any existing revision/tag suffix.
     //
-    memccpy (result, filename, 0, size);
+    strtcpy (result, filename, size);
     char *sep = strrchr (result, FRM);
     if (sep) *sep = 0;
 
@@ -572,7 +574,7 @@ static void housedepot_revision_cleanscan (struct dirent **files, int n) {
 
 static void housedepot_revision_getdir (const char *filename,
                                         char *dirname, int size) {
-    memccpy (dirname, filename, 0, size);
+    strtcpy (dirname, filename, size);
     char *dirsep = strrchr (dirname, '/');
     if (dirsep) *dirsep = 0;
     else {
@@ -600,7 +602,7 @@ const char *housedepot_revision_purge (const char *clientname,
 
     struct dirent **files = 0;
 
-    memccpy (dirname, filename, 0, sizeof(dirname));
+    strtcpy (dirname, filename, sizeof(dirname));
     scandir_exact = strrchr (dirname, '/');
     if (!scandir_exact) return "invalid name";
     *(scandir_exact++) = 0;
