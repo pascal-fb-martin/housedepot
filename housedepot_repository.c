@@ -50,10 +50,10 @@
 
 #define DEBUG if (housedepot_isdebug()) printf
 
-static echttp_catalog housedepot_repository_roots;
-static echttp_catalog housedepot_repository_depth;
+static echttp_catalog housedepot_repository_roots = {0};
+static echttp_catalog housedepot_repository_depth = {0};
 
-static echttp_catalog housedepot_repository_type;
+static echttp_catalog housedepot_repository_type = {0};
 
 static const char *housedepot_repository_host;
 static const char *housedepot_repository_portal;
@@ -331,6 +331,10 @@ void housedepot_repository_initialize (const char *hostname,
 
     static int Initialized = 0;
     if (!Initialized) {
+        echttp_catalog_create (&housedepot_repository_type);
+        echttp_catalog_create (&housedepot_repository_roots);
+        echttp_catalog_create (&housedepot_repository_depth);
+
         // Catalog the supported content types.
         int i;
         for (i = 0; housedepot_repository_supported[i].extension; ++i) {
