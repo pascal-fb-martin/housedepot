@@ -433,7 +433,6 @@ const char *housedepot_revision_checkin (const char *clientname,
         return "Cannot create link for default file";
 
     houselog_event ("FILE", clientname, "CHECKED IN", "REVISION %d", newrev);
-
     housedepot_revision_set_update_timestamp ();
     return 0;
 }
@@ -499,7 +498,6 @@ const char *housedepot_revision_apply (const char *tag,
     if (!realrev) realrev = "~(invalid)"; // Thou shall not crash.
     houselog_event ("FILE", clientname, "APPLIED",
                     "TAG %s TO REVISION %s", tag, realrev+1);
-
     housedepot_revision_set_update_timestamp ();
     return 0;
 }
@@ -622,6 +620,9 @@ const char *housedepot_revision_purge (const char *clientname,
         unlink (fullname);
     }
 
+    houselog_event ("FILE", clientname, "PURGED", "");
+    housedepot_revision_set_update_timestamp ();
+
     scandir_exact = 0;
     scandir_pattern = 0;
     scandir_pattern_length = 0;
@@ -648,6 +649,7 @@ const char *housedepot_revision_delete (const char *clientname,
             return housedepot_revision_purge (clientname, filename);
         unlink (fullname);
         houselog_event ("FILE", clientname, "REMOVED", "TAG %s", revision);
+        housedepot_revision_set_update_timestamp ();
         return 0;
     }
 
@@ -706,7 +708,6 @@ const char *housedepot_revision_delete (const char *clientname,
     const char *realrev = strrchr (fullname, FRM);
     if (!realrev) realrev = "~(invalid)"; // Thou shall not crash.
     houselog_event ("FILE", clientname, "DELETED", "REVISION %s", realrev+1);
-
     housedepot_revision_set_update_timestamp ();
     return 0;
 }
