@@ -56,6 +56,7 @@ install-ui: install-preamble
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(SHARE)/public/depot
 	$(INSTALL) -m 0644 public/* $(DESTDIR)$(SHARE)/public/depot
 	$(INSTALL) -m 0755 -d $(DESTDIR)/var/cache/house/depot
+	if [ "x$(DESTDIR)" = "x" ] ; then grep -q '^house:' /etc/passwd && chown -R house:house /var/cache/house/depot ; fi
 
 install-runtime: install-preamble
 	$(INSTALL) -m 0755 -s housedepot $(DESTDIR)$(prefix)/bin

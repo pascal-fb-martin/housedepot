@@ -6,6 +6,7 @@ case $1 in
     configure|abort-upgrade|abort-deconfigure|abort-remove)
         . /usr/local/share/house/postinstall
         chown -R house:house /var/lib/house/depot
+        chown -R house:house /var/cache/house/depot
         ;;
 esac
 
