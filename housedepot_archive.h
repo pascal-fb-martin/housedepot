@@ -22,7 +22,11 @@
  * housedepot_archive.h: a module to manage archive backup and restore.
  */
 
+const char *housedepot_archive_download (const char *name);
 const char *housedepot_archive_backup (void);
+const char *housedepot_archive_list (void);
+
+const char *housedepot_archive_delete (const char *name);
 
 void housedepot_archive_initialize (const char *hostname,
                                     const char *root, int state);

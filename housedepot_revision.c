@@ -751,8 +751,8 @@ const char *housedepot_revision_list (const char *clientname,
     struct dirent **files = 0;
 
     int cursor = snprintf (buffer, sizeof(buffer),
-                           "{\"host\":\"%s\",\"timestamp\":%d",
-                           housedepot_revision_host, (int)time(0));
+                           "{\"host\":\"%s\",\"timestamp\":%lld",
+                           housedepot_revision_host, (long long)time(0));
     if (housedepot_revision_portal)
         cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor,
                            ",\"proxy\":\"%s\"", housedepot_revision_portal);

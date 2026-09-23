@@ -309,8 +309,8 @@ static const char *housedepot_repository_check (const char *action,
                                                 const char *data, int length) {
 
     snprintf (housedepot_repositories, sizeof(housedepot_repositories),
-              "{\"host\":\"%s\",\"timestamp\":%d,\"updated\":%lld}",
-              housedepot_repository_host, (int)time(0),
+              "{\"host\":\"%s\",\"timestamp\":%lld,\"updated\":%lld}",
+              housedepot_repository_host, (long long)time(0),
               housedepot_revision_get_update_timestamp());
     echttp_content_type_json();
     return housedepot_repositories;

@@ -21,10 +21,24 @@
  *
  * housedepot_archive.c: a module to manage archive backup and restore.
  *
+ * const char *housedepot_archive_download (const char *name);
+ *
+ *    Download an existing archive.
+ *
  * const char *housedepot_archive_backup (void);
  *
- *    Create a new backup archive, if necessary (i.e. if the state of
- *    the repositories has changed since the most recent backup).
+ *    Download the latest archive. A new archive is created if necessary
+ *    (i.e. if the state of the repositories has changed since the most
+ *    recent backup).
+ *
+ * const char *housedepot_archive_delete (const char *name);
+ *
+ *    Delete the specified file and return the updated list of archives.
+ *
+ * const char *housedepot_archive_list (void);
+ *
+ *    List existing archives as a JSON object. May return an empty string
+ *    if there was no update since the latest check, or on error.
  *
  * void housedepot_archive_initialize (const char *hostname,
  *                                     const char *root, int state);
@@ -85,32 +99,102 @@ const char *housedepot_archive_backup (void) {
                       "/usr/bin/tar czf %s -C / %s", filename, DepotRoot+1);
             system (command);
 
-            DepotLatestBackupState = state;
+            housestate_changed (DepotLive); // Because an archive was created.
+            DepotLatestBackupState = housestate_current (DepotLive);
             strtcpy (DepotLatestBackupFile, filename, sizeof(filename));
         }
     }
 
-    int fd = open (DepotLatestBackupFile, O_RDONLY);
-    if (fd < 0) return "Archive not created";
+    return housedepot_archive_download (0);
+}
+
+const char *housedepot_archive_download (const char *name) {
+
+    int fd;
+    if (name) {
+        char path[256];
+        snprintf (path, sizeof(path), "%s/%s", DepotCache, name);
+        fd = open (path, O_RDONLY);
+    } else {
+        name = strrchr (DepotLatestBackupFile, '/');
+        if (name) name += 1;
+        else name = DepotLatestBackupFile; // Should never happen.
+        fd = open (DepotLatestBackupFile, O_RDONLY);
+    }
+    if (fd < 0) return "Archive not found";
 
     struct stat archivestat;
     if (fstat (fd, &archivestat) < 0) {
         close (fd);
         return "Cannot access archive";
     }
-    char *basename = strrchr (DepotLatestBackupFile, '/');
-    if (basename) basename += 1;
-    else basename = DepotLatestBackupFile; // Should never happen.
 
     static char disposition[512];
     snprintf (disposition, sizeof(disposition),
-              "attachment; filename=\"%s\"", basename);
+              "attachment; filename=\"%s\"", name);
     echttp_attribute_set ("Content-Disposition", disposition);
 
     echttp_transfer (fd, archivestat.st_size);
 
     echttp_content_type_set ("application/gzip");
     return 0;
+}
+
+const char *housedepot_archive_delete (const char *name) {
+
+    if (!name) return "";
+
+    char path[256];
+    snprintf (path, sizeof(path), "%s/%s", DepotCache, name);
+    unlink (path);
+    housestate_changed (DepotLive); // Because an archive was deleted.
+
+    return housedepot_archive_list ();
+}
+
+static int housedepot_archive_filter (const struct dirent *e) {
+
+    const char *suffix = strrchr (e->d_name, '.');
+    if (!suffix) return 0;
+    if (!strsame (suffix, ".tgz")) return 0;
+    return 1;
+}
+
+const char *housedepot_archive_list (void) {
+
+    if (housestate_same (DepotLive)) return "";
+
+    static char buffer[16000];
+
+    int cursor = snprintf (buffer, sizeof(buffer),
+                           "{\"host\":\"%s\",\"timestamp\":%lld"
+                               ",\"latest\":%lu,\"archives\":[",
+                           DepotHost, (long long)time(0),
+                               housestate_current (DepotLive));
+
+    struct dirent **files = 0;
+    int n = scandir (DepotCache, &files, housedepot_archive_filter, alphasort);
+
+    int i;
+    const char *prefix = "";
+    for (i = 0; i < n; i++) {
+         struct dirent *ent = files[i];
+         if (ent->d_name[0] == '.') continue; // Skip hidden files, . and ..
+         if (ent->d_type != DT_REG) continue; // Skip directories, links, etc.
+
+         cursor += snprintf (buffer+cursor, sizeof(buffer)-cursor,
+                             "%s\"%s\"", prefix, ent->d_name);
+         prefix = ",";
+    }
+    for (i = 0; i < n; i++) {
+         free (files[i]);
+    }
+    if (files) free (files);
+
+    snprintf (buffer+cursor, sizeof(buffer)-cursor, "]}");
+
+    echttp_content_type_json();
+    return buffer;
 }
 
 void housedepot_archive_initialize (const char *hostname,

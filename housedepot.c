@@ -55,13 +55,32 @@ int housedepot_isdebug (void) {
     return Debug;
 }
 
-static const char *create_backup (const char *action,
-                                  const char *uri,
-                                  const char *data, int length) {
+static const char *depot_backup (const char *action,
+                                 const char *uri,
+                                 const char *data, int length) {
 
-    const char *error = housedepot_archive_backup ();
+    const char *name = echttp_parameter_get ("name");
+
+    const char *error;
+    if (name) error = housedepot_archive_download (name);
+    else error = housedepot_archive_backup ();
+
     if (error) echttp_error (500, error);
     return "";
+}
+
+static const char *depot_archive_all (const char *action,
+                                      const char *uri,
+                                      const char *data, int length) {
+
+    return housedepot_archive_list ();
+}
+
+static const char *depot_archive_delete (const char *action,
+                                         const char *uri,
+                                         const char *data, int length) {
+
+    return housedepot_archive_delete (echttp_parameter_get ("name"));
 }
 
 static void housedepot_background (int fd, int mode) {
@@ -122,7 +141,9 @@ int main (int argc, const char **argv) {
 
     housedepot_archive_initialize (houselog_host(), root, state);
 
-    echttp_route_uri ("/depot/backup", create_backup);
+    echttp_route_uri ("/depot/backup", depot_backup);
+    echttp_route_uri ("/depot/archive/all", depot_archive_all);
+    echttp_route_uri ("/depot/archive/delete", depot_archive_delete);
 
     echttp_static_route ("/", "/usr/local/share/house/public");
     echttp_background (&housedepot_background);

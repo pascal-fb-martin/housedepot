@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel=stylesheet type="text/css" href="/house.css" title="House">
+<script>
+
+var CurrentDepotState = 0;
+
+function newFileLink (target, text) {
+    var inner = document.createElement("td");
+    var link = document.createElement("a");
+    link.href = target;
+    link.innerHTML = text;
+    inner.appendChild(link);
+    return inner;
+}
+
+function newFileAction (text, command, uri) {
+    var button = document.createElement("button");
+    button.innerHTML = text;
+    button.disabled = false;
+    button.depotUri = uri;
+    button.onclick = command;
+    return button;
+}
+
+function depotCleanTable (id) {
+    var table = document.getElementById (id);
+    for (var i = table.rows.length-1; i > 0; i--) {
+        table.deleteRow(i);
+    }
+    return table;
+}
+
+function depotDelete () {
+    var command = new XMLHttpRequest();
+    command.open("DELETE", '/depot/archive/delete?name='+this.depotUri);
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            depotRefresh (JSON.parse(command.responseText));
+        }
+    }
+    command.send(null);
+}
+
+function depotShowFiles (response) {
+
+    var title = response.host+' - Depot';
+    document.getElementsByTagName ('title')[0].innerHTML = title;
+
+    var filelist = depotCleanTable ('files');
+    for (var i = 0; i < response.archives.length; i++) {
+        var file = response.archives[i];
+        var outer = filelist.insertRow();
+        outer.appendChild(newFileLink('/depot/backup?name='+file, file));
+        var inner = document.createElement("td");
+        inner.appendChild
+            (newFileAction("Delete", depotDelete, file));
+        outer.appendChild(inner);
+    }
+    CurrentDepotState = response.latest?response.latest:0;
+}
+
+function depotRefresh (response) {
+    var x = window.scrollX;
+    var y = window.scrollY;
+    depotShowFiles(response);
+    window.scrollTo(x, y);
+}
+
+function depotCheck () {
+    var command = new XMLHttpRequest();
+    var url = "/depot/archive/all";
+    if (CurrentDepotState) url += '?known='+CurrentDepotState;
+    command.open("GET", url);
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            depotRefresh (JSON.parse(command.responseText));
+        }
+    }
+    command.send(null);
+}
+
+window.onload = function() {
+
+   depotCheck();
+   setInterval (depotCheck, 3000);
+};
+</script>
+<head>
+   <title>Depot</title>
+</head>
+<body>
+   <nav>
+   <table>
+   <tr>
+   <td><a href="/depot/index.html>Depot</a></td>
+   <td><span>Archives</span></td>
+   <td><a href="/depot/events.html">Events</a></td>
+   </tr>
+   </table>
+   </nav>
+   <main>
+   <article>
+   <section>
+   <br>
+   <table class="housewidetable" border="0">
+   <tr>
+   <td width="60%"></td>
+   <td width="40%"><a class="housepanelbuttongroup housepanelbutton" href="/depot/backup">Backup</a></td>
+   </tr>
+   </table>
+   <br>
+   <table class="housewidetable" id="files" border="0">
+      <tr>
+         <th width="60%">NAME</th>
+         <th width="40%">ACTIONS</th>
+      </tr>
+   </table>
+   </section>
+   </article>
+   </main>
+</body>
+</html>
+

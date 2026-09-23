@@ -212,6 +212,25 @@ It is not allowed to delete a predefined tag, or a revision that a predefined ta
 
 It is planned to support revision=all, which would delete any occurrence of the file (all revisions and all tags) in one sweep. This is delayed until HouseDepot code base is considered stable.
 
+```
+GET /depot/backup
+GET /depot/backup?name=STRING
+```
+
+Download an archive. The first form downloads the latest, up-to-date archive; a new archive is created if any repository has been modified since the latest archive. The second form downloads the specified archive.
+
+```
+GET /depot/archive/all
+```
+
+List all backup archives. This returns a JSON object that contains an array  (named "archives") of file names.
+
+```
+GET /depot/archive/delete?name=STRING
+```
+
+Delete the specified archive and return the updated list of archives.
+
 ## Configuration
 
 There is no user configuration file.
