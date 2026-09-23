@@ -52,11 +52,12 @@
  *   Set a default value for one command line option. Must be called
  *   before housedepot_revision_initialize().
  *
- * void housedepot_revision_initialize (const char *host,
- *                                      const char *portal,
- *                                      int argc, const char *argv[]);
+ * int housedepot_revision_initialize (const char *host,
+ *                                     const char *portal,
+ *                                     int argc, const char *argv[]);
  *
- *   Provides the context to report when formatting responses.
+ *   Provides the context to report when formatting responses. This returns
+ *   the handle for the server's live state (see module housestate.c).
  *
  * int housedepot_revision_visible (const char *group);
  *
@@ -154,6 +155,7 @@
 #include "echttp_libc.h"
 
 #include <houselog.h>
+#include <housestate.h>
 
 #include "housedepot_revision.h"
 
@@ -173,11 +175,14 @@ static char housedepot_valid_revision[256] = {0};
 
 long long housedepot_revision_updated = 0;
 
+static int DepotLive = 0;
+
 static void housedepot_revision_set_update_timestamp (void) {
 
     struct timeval now;
     gettimeofday (&now, 0);
 
+    housestate_changed (DepotLive);
     housedepot_revision_updated = ((long long)now.tv_sec * 1000) + (now.tv_usec / 1000);
 }
 
@@ -218,9 +223,9 @@ void housedepot_revision_default (const char *arg) {
     }
 }
 
-void housedepot_revision_initialize (const char *host,
-                                     const char *portal,
-                                     int argc, const char *argv[]) {
+int housedepot_revision_initialize (const char *host,
+                                    const char *portal,
+                                    int argc, const char *argv[]) {
 
     int i;
     for (i = 1; i < argc; ++i) {
@@ -238,7 +243,9 @@ void housedepot_revision_initialize (const char *host,
     housedepot_valid_revision['_'] = 1;
     housedepot_valid_revision['-'] = 1;
 
+    DepotLive = housestate_declare ("Live");
     housedepot_revision_set_update_timestamp ();
+    return DepotLive;
 }
 
 static int housedepot_revision_isvalid (const char *revision) {

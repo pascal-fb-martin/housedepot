@@ -39,17 +39,29 @@
 #include "echttp_cors.h"
 #include "echttp_json.h"
 #include "echttp_static.h"
+
+#include "housediscover.h"
 #include "houseportalclient.h"
 #include "houselog.h"
 #include "houseconfig.h"
 
 #include "housedepot_revision.h"
 #include "housedepot_repository.h"
+#include "housedepot_archive.h"
 
 static int Debug = 0;
 
 int housedepot_isdebug (void) {
     return Debug;
+}
+
+static const char *create_backup (const char *action,
+                                  const char *uri,
+                                  const char *data, int length) {
+
+    const char *error = housedepot_archive_backup ();
+    if (error) echttp_error (500, error);
+    return "";
 }
 
 static void housedepot_background (int fd, int mode) {
@@ -90,6 +102,7 @@ int main (int argc, const char **argv) {
         houseportal_initialize (argc, argv);
         houseportal_declare (echttp_port(4), path, 1);
     }
+    housediscover_initialize (argc, argv);
     houselog_initialize ("depot", argc, argv);
 
     echttp_cors_allow_method("GET");
@@ -102,10 +115,14 @@ int main (int argc, const char **argv) {
             continue;
         }
     }
-    housedepot_revision_initialize
-       (houselog_host(), houseportal_server(), argc, argv);
+    int state = housedepot_revision_initialize
+                    (houselog_host(), houseportal_server(), argc, argv);
     housedepot_repository_initialize
-       (houselog_host(), houseportal_server(), root);
+       (houselog_host(), houseportal_server(), root, state);
+
+    housedepot_archive_initialize (houselog_host(), root, state);
+
+    echttp_route_uri ("/depot/backup", create_backup);
 
     echttp_static_route ("/", "/usr/local/share/house/public");
     echttp_background (&housedepot_background);

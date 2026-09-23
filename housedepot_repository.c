@@ -24,7 +24,7 @@
  *
  * void housedepot_repository_initialize (const char *hostname,
  *                                        const char *portal,
- *                                        const char *parent);
+ *                                        const char *parent, int state);
  *
  *    Set the host and portal names, initialize the module's resources and
  *    initialize the context for each repository found.
@@ -44,6 +44,8 @@
 #include "echttp_static.h"
 #include "echttp_catalog.h"
 #include "echttp_libc.h"
+
+#include "housestate.h"
 
 #include "housedepot_revision.h"
 #include "housedepot_repository.h"
@@ -76,6 +78,8 @@ static struct {
     {"txt",  "text/plain"},
     {0, 0}
 };
+
+static int DepotLive = 0;
 
 static const char *housedepot_repository_transfer (int fd,
                                                    const char *filename,
@@ -274,12 +278,16 @@ static const char *housedepot_repository_list (const char *action,
                                                const char *uri,
                                                const char *data, int length) {
 
+    if (housestate_same (DepotLive)) return "";
+
     char *buffer = housedepot_repositories;
     const int size = sizeof(housedepot_repositories);
 
     int cursor = snprintf (buffer, size,
-                           "{\"host\":\"%s\",\"timestamp\":%d",
-                           housedepot_repository_host, (int)time(0));
+                           "{\"host\":\"%s\",\"timestamp\":%lld,\"latest\":%lu",
+                           housedepot_repository_host,
+                           (long long)time(0),
+                           housestate_current (DepotLive));
     if (housedepot_repository_portal)
         cursor += snprintf (buffer+cursor, size-cursor,
                            ",\"proxy\":\"%s\"", housedepot_repository_portal);
@@ -327,7 +335,7 @@ static int housedepot_repository_route (const char *uri, const char *path) {
 
 void housedepot_repository_initialize (const char *hostname,
                                        const char *portal,
-                                       const char *parent) {
+                                       const char *parent, int state) {
 
     static int Initialized = 0;
     if (!Initialized) {
@@ -363,6 +371,7 @@ void housedepot_repository_initialize (const char *hostname,
            housedepot_revision_repair (path);
         }
         if (files) free (files);
+        DepotLive = state;
         Initialized = 1;
     }
 }

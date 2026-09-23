@@ -6,5 +6,5 @@ int housedepot_isdebug (void); // FIXME: not in the right place.
 
 void housedepot_repository_initialize (const char *hostname,
                                        const char *portal,
-                                       const char *parent);
+                                       const char *parent, int state);
 

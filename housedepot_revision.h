@@ -5,7 +5,7 @@
 
 void housedepot_revision_default (const char *arg);
 
-void housedepot_revision_initialize (const char *host,
+int  housedepot_revision_initialize (const char *host,
                                      const char *portal,
                                      int argc, const char *argv[]);
 

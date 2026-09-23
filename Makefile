@@ -31,7 +31,10 @@ HCAT=infrastructure
 
 # Application build. --------------------------------------------
 
-OBJS= housedepot.o housedepot_repository.o housedepot_revision.o
+OBJS= housedepot.o \
+      housedepot_repository.o \
+      housedepot_revision.o \
+      housedepot_archive.o
 LIBOJS=
 
 all: housedepot
@@ -52,6 +55,7 @@ housedepot: $(OBJS)
 install-ui: install-preamble
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(SHARE)/public/depot
 	$(INSTALL) -m 0644 public/* $(DESTDIR)$(SHARE)/public/depot
+	$(INSTALL) -m 0755 -d $(DESTDIR)/var/cache/house/depot
 
 install-runtime: install-preamble
 	$(INSTALL) -m 0755 -s housedepot $(DESTDIR)$(prefix)/bin
