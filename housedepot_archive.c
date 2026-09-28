@@ -96,7 +96,7 @@ const char *housedepot_archive_backup (void) {
             // against any change being performed while writing the archive.
             char command[512];
             snprintf (command, sizeof(command),
-                      "/usr/bin/tar czf %s -C / %s", filename, DepotRoot+1);
+                      "/usr/bin/tar czf %s -C %s .", filename, DepotRoot);
             system (command);
 
             housestate_changed (DepotLive); // Because an archive was created.
