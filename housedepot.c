@@ -39,6 +39,7 @@
 #include "echttp_cors.h"
 #include "echttp_json.h"
 #include "echttp_static.h"
+#include "echttp_libc.h"
 
 #include "housediscover.h"
 #include "houseportalclient.h"
@@ -50,6 +51,7 @@
 #include "housedepot_archive.h"
 
 static int Debug = 0;
+static const char *DepotRoot = "/var/lib/house/depot";
 
 int housedepot_isdebug (void) {
     return Debug;
@@ -66,6 +68,27 @@ static const char *depot_backup (const char *action,
     else error = housedepot_archive_backup ();
 
     if (error) echttp_error (500, error);
+    return "";
+}
+
+static const char *depot_restore (const char *action,
+                                  const char *uri,
+                                  const char *data, int length) {
+
+    const char *name = echttp_parameter_get ("name");
+    if (!name) {
+        echttp_error (500, "Missing archive name");
+    } else if (strsame (action, "GET")) {
+        const char *error = housedepot_archive_restore (name);
+        if (!error) {
+            housedepot_repository_reload (DepotRoot);
+            housedepot_revision_reload ();
+        } else {
+            echttp_error (500, error);
+        }
+    } else {
+        echttp_error (400, "Invalid method");
+    }
     return "";
 }
 
@@ -101,9 +124,6 @@ static void housedepot_protect (const char *method, const char *uri) {
 
 int main (int argc, const char **argv) {
 
-    int i;
-    const char *root = "/var/lib/house/depot";
-
     // These strange statements are to make sure that fds 0 to 2 are
     // reserved, since this application might output some errors.
     // 3 descriptors are wasted if 0, 1 and 2 are already open. No big deal.
@@ -127,8 +147,9 @@ int main (int argc, const char **argv) {
     echttp_cors_allow_method("GET");
     echttp_protect (0, housedepot_protect);
 
+    int i;
     for (i = 1; i < argc; ++i) {
-        if (echttp_option_match ("-root=", argv[i], &root)) continue;
+        if (echttp_option_match ("-root=", argv[i], &DepotRoot)) continue;
         if (echttp_option_present ("-debug", argv[i])) {
             Debug = 1;
             continue;
@@ -137,17 +158,18 @@ int main (int argc, const char **argv) {
     int state = housedepot_revision_initialize
                     (houselog_host(), houseportal_server(), argc, argv);
     housedepot_repository_initialize
-       (houselog_host(), houseportal_server(), root, state);
+       (houselog_host(), houseportal_server(), DepotRoot, state);
 
-    housedepot_archive_initialize (houselog_host(), root, state);
+    housedepot_archive_initialize (houselog_host(), DepotRoot, state);
 
     echttp_route_uri ("/depot/backup", depot_backup);
+    echttp_route_uri ("/depot/restore", depot_restore);
     echttp_route_uri ("/depot/archive/all", depot_archive_all);
     echttp_route_uri ("/depot/archive/delete", depot_archive_delete);
 
     echttp_static_route ("/", "/usr/local/share/house/public");
     echttp_background (&housedepot_background);
-    houselog_event ("SERVICE", "depot", "STARTED", "ON %s", houselog_host());
+    houselog_event ("SERVICE", "depot", "STARTED", "DATA IN %s", DepotRoot);
     echttp_loop();
 }
 

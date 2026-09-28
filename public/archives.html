@@ -43,6 +43,17 @@ function depotDelete () {
     command.send(null);
 }
 
+function depotRestore () {
+    var command = new XMLHttpRequest();
+    command.open("GET", '/depot/restore?name='+this.depotUri);
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            depotRefresh (JSON.parse(command.responseText));
+        }
+    }
+    command.send(null);
+}
+
 function depotShowFiles (response) {
 
     var title = response.host+' - Depot';
@@ -56,6 +67,8 @@ function depotShowFiles (response) {
         var inner = document.createElement("td");
         inner.appendChild
             (newFileAction("Delete", depotDelete, file));
+        inner.appendChild
+            (newFileAction("Restore", depotRestore, file));
         outer.appendChild(inner);
     }
     CurrentDepotState = response.latest?response.latest:0;
@@ -94,7 +107,7 @@ window.onload = function() {
    <nav>
    <table>
    <tr>
-   <td><a href="/depot/index.html>Depot</a></td>
+   <td><a href="/depot/index.html">Depot</a></td>
    <td><span>Archives</span></td>
    <td><a href="/depot/events.html">Events</a></td>
    </tr>

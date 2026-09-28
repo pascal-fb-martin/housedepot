@@ -31,6 +31,14 @@
  *    (i.e. if the state of the repositories has changed since the most
  *    recent backup).
  *
+ * const char *housedepot_archive_restore (const char *name);
+ *
+ *    Restore the specified archive. The existing data is archived (if
+ *    necessary) and then wipped out. The archive file must be present in
+ *    the depot archive cache.
+ *
+ *    Return 0 on success, an error string on failure.
+ *
  * const char *housedepot_archive_delete (const char *name);
  *
  *    Delete the specified file and return the updated list of archives.
@@ -60,6 +68,8 @@
 #include "echttp.h"
 #include "echttp_libc.h"
 
+#include "houselog.h"
+
 #include "housestate.h"
 #include "housedepot_archive.h"
 
@@ -74,7 +84,15 @@ static int DepotLive = 0;
 static unsigned long DepotLatestBackupState = 0;
 static char          DepotLatestBackupFile[256] = "";
 
-const char *housedepot_archive_backup (void) {
+static const char *housedepot_archive_base (const char *path) {
+
+    const char *name = strrchr (path, '/');
+    if (name) name += 1;
+    else name = path; // Should never happen.
+    return name;
+}
+
+static void housedepot_archive_save (void) {
 
     unsigned long state = housestate_current (DepotLive);
     if (!DepotLatestBackupFile[0] || (state != DepotLatestBackupState)) {
@@ -99,13 +117,37 @@ const char *housedepot_archive_backup (void) {
                       "/usr/bin/tar czf %s -C %s .", filename, DepotRoot);
             system (command);
 
+            const char *name = housedepot_archive_base (filename);
+            houselog_event ("ARCHIVE", name, "CREATED", "");
+
             housestate_changed (DepotLive); // Because an archive was created.
             DepotLatestBackupState = housestate_current (DepotLive);
             strtcpy (DepotLatestBackupFile, filename, sizeof(filename));
         }
     }
+}
 
+const char *housedepot_archive_backup (void) {
+    housedepot_archive_save ();
     return housedepot_archive_download (0);
+}
+
+const char *housedepot_archive_restore (const char *name) {
+
+    housedepot_archive_save ();
+
+    char command[512];
+    snprintf (command, sizeof(command),
+              "/usr/bin/rm -rf %s/*", DepotRoot);
+    system (command);
+
+    snprintf (command, sizeof(command),
+              "/usr/bin/tar xf %s/%s -C %s", DepotCache, name, DepotRoot);
+    int status = system (command);
+    if (status) return "Archive extraction failed";
+
+    houselog_event ("ARCHIVE", name, "RESTORED", "");
+    return 0;
 }
 
 const char *housedepot_archive_download (const char *name) {
@@ -116,9 +158,7 @@ const char *housedepot_archive_download (const char *name) {
         snprintf (path, sizeof(path), "%s/%s", DepotCache, name);
         fd = open (path, O_RDONLY);
     } else {
-        name = strrchr (DepotLatestBackupFile, '/');
-        if (name) name += 1;
-        else name = DepotLatestBackupFile; // Should never happen.
+        name = housedepot_archive_base (DepotLatestBackupFile);
         fd = open (DepotLatestBackupFile, O_RDONLY);
     }
     if (fd < 0) return "Archive not found";
@@ -147,6 +187,12 @@ const char *housedepot_archive_delete (const char *name) {
     char path[256];
     snprintf (path, sizeof(path), "%s/%s", DepotCache, name);
     unlink (path);
+    houselog_event ("ARCHIVE", name, "DELETED", "");
+
+    if (DepotLatestBackupFile[0]) {
+        const char *latest = housedepot_archive_base (DepotLatestBackupFile);
+        if (strsame (name, latest)) DepotLatestBackupFile[0] = 0;
+    }
     housestate_changed (DepotLive); // Because an archive was deleted.
 
     return housedepot_archive_list ();

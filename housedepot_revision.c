@@ -59,7 +59,7 @@
  *   Provides the context to report when formatting responses. This returns
  *   the handle for the server's live state (see module housestate.c).
  *
- * int housedepot_revision_reload (void);
+ * void housedepot_revision_reload (void);
  *
  *   Update the module's internal context after the depot repositories were
  *   restored from an archive.
