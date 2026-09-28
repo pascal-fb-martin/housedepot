@@ -9,6 +9,8 @@ int  housedepot_revision_initialize (const char *host,
                                      const char *portal,
                                      int argc, const char *argv[]);
 
+void housedepot_revision_reload (void);
+
 int housedepot_revision_visible (const char *group);
 
 int housedepot_revision_checkout (const char *filename,

@@ -28,6 +28,11 @@
  *
  *    Set the host and portal names, initialize the module's resources and
  *    initialize the context for each repository found.
+ *
+ * void housedepot_repository_reload (const char *parent);
+ *
+ *    Reload repository indexes. This must be called when a depot was
+ *    restored from an archive. The parent directory may change each time.
  */
 
 #include <unistd.h>
@@ -57,7 +62,7 @@ static echttp_catalog housedepot_repository_depth = {0};
 
 static echttp_catalog housedepot_repository_type = {0};
 
-static const char *housedepot_repository_host;
+static const char *housedepot_repository_host = 0;
 static const char *housedepot_repository_portal;
 
 /* List the supported content types.
@@ -337,11 +342,9 @@ void housedepot_repository_initialize (const char *hostname,
                                        const char *portal,
                                        const char *parent, int state) {
 
-    static int Initialized = 0;
-    if (!Initialized) {
+    if (!housedepot_repository_host) {
+
         echttp_catalog_create (&housedepot_repository_type);
-        echttp_catalog_create (&housedepot_repository_roots);
-        echttp_catalog_create (&housedepot_repository_depth);
 
         // Catalog the supported content types.
         int i;
@@ -352,28 +355,62 @@ void housedepot_repository_initialize (const char *hostname,
         }
         housedepot_repository_host = hostname;
         housedepot_repository_portal = portal;
+        DepotLive = state;
+
         echttp_route_uri ("/depot/all", housedepot_repository_list);
         echttp_route_uri ("/depot/check", housedepot_repository_check);
 
-        // Find out all the repositories and initialize them.
-        struct dirent **files = 0;
-        int n = scandir (parent, &files, 0, 0);
-        for (i = 0; i < n; i++) {
-           struct dirent *ent = files[i];
-           if (ent->d_name[0] == '.') continue; // Skip hidden entries.
-           if (ent->d_type != DT_DIR) continue; // Must be a directory.
-           char uri[300];
-           char path[350];
-           snprintf (uri, sizeof(uri), "/depot/%s", ent->d_name);
-           snprintf (path, sizeof(path), "%s/%s", parent, ent->d_name);
-           housedepot_repository_route (strdup(uri), strdup(path));
-           free (ent);
-           housedepot_revision_repair (path);
-        }
-        if (files) free (files);
-        DepotLive = state;
-        Initialized = 1;
+        housedepot_repository_reload (parent);
     }
 }
 
+static int housedepot_repository_free_all (const char *name,
+                                           const char *value) {
+    free ((char *)value);
+    echttp_route_remove (name);
+    free ((char *)name);
+    return 0;
+}
+
+static int housedepot_repository_free_value (const char *name,
+                                             const char *value) {
+    free ((char *)value);
+    return 0;
+}
+
+void housedepot_repository_reload (const char *parent) {
+
+    static int AlreadyLoaded = 0;
+
+    if (AlreadyLoaded) {
+        // Warning! The order is important: the depth catalog must be first
+        // because the same "name" is used for the depth and roots catalogs.
+        echttp_catalog_free (&housedepot_repository_depth,
+                             housedepot_repository_free_value);
+        echttp_catalog_free (&housedepot_repository_roots,
+                             housedepot_repository_free_all);
+    }
+    echttp_catalog_create (&housedepot_repository_roots);
+    echttp_catalog_create (&housedepot_repository_depth);
+
+    // Find out all the repositories and initialize them.
+    struct dirent **files = 0;
+    int n = scandir (parent, &files, 0, 0);
+    int i;
+    for (i = 0; i < n; i++) {
+       struct dirent *ent = files[i];
+       if (ent->d_name[0] == '.') continue; // Skip hidden entries.
+       if (ent->d_type != DT_DIR) continue; // Must be a directory.
+       char uri[300];
+       char path[350];
+       snprintf (uri, sizeof(uri), "/depot/%s", ent->d_name);
+       snprintf (path, sizeof(path), "%s/%s", parent, ent->d_name);
+       housedepot_repository_route (strdup(uri), strdup(path));
+       free (ent);
+       housedepot_revision_repair (path);
+    }
+    if (files) free (files);
+
+    AlreadyLoaded = 1;
+}
 

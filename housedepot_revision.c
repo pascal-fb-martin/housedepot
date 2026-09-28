@@ -59,6 +59,11 @@
  *   Provides the context to report when formatting responses. This returns
  *   the handle for the server's live state (see module housestate.c).
  *
+ * int housedepot_revision_reload (void);
+ *
+ *   Update the module's internal context after the depot repositories were
+ *   restored from an archive.
+ *
  * int housedepot_revision_visible (const char *group);
  *
  *   Return 1 if this service should list the named group.
@@ -246,6 +251,10 @@ int housedepot_revision_initialize (const char *host,
     DepotLive = housestate_declare ("Live");
     housedepot_revision_set_update_timestamp ();
     return DepotLive;
+}
+
+void housedepot_revision_reload (void) {
+    housedepot_revision_set_update_timestamp ();
 }
 
 static int housedepot_revision_isvalid (const char *revision) {

@@ -8,3 +8,5 @@ void housedepot_repository_initialize (const char *hostname,
                                        const char *portal,
                                        const char *parent, int state);
 
+void housedepot_repository_reload (const char *parent);
+
