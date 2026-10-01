@@ -94,7 +94,39 @@ function depotCheck () {
     command.send(null);
 }
 
+function getbasename (file) {
+    return file.name.replace(/^.*[\/\\]/, '');
+}
+
+function depotUploadRequest (file) {
+    const command = new XMLHttpRequest();
+    command.open("POST", "/depot/archive/upload?name="+getbasename(file));
+    command.setRequestHeader('Content-Type', 'application/gzip');
+    command.send(file);
+}
+
+function depotUploadAction () {
+    if (FileUploadDialog.returnValue !== 'submit') return;
+
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0]; // Get the first selected file
+    if (!file) {
+       alert ("Please select an archive file.");
+       return;
+    }
+    depotUploadRequest (file);
+}
+
+function depotUploadShow () {
+
+    FileUploadDialog = document.getElementById('uploadDialog');
+    FileUploadDialog.addEventListener('close', depotUploadAction);
+    FileUploadDialog.showModal();
+}
+
 window.onload = function() {
+
+   document.getElementById('uploadButton').addEventListener('click', depotUploadShow);
 
    depotCheck();
    setInterval (depotCheck, 3000);
@@ -119,8 +151,13 @@ window.onload = function() {
    <br>
    <table class="housewidetable" border="0">
    <tr>
-   <td width="60%"></td>
-   <td width="40%"><a class="housepanelbuttongroup housepanelbutton" href="/depot/backup">Backup</a></td>
+   <td width="50%"></td>
+   <td width="10%">
+       <button id="uploadButton">Upload</button>
+   </td>
+   <td width="40%">
+       <a class="housepanelbuttongroup housepanelbutton" href="/depot/backup">Backup</a>
+   </td>
    </tr>
    </table>
    <br>
@@ -131,6 +168,16 @@ window.onload = function() {
       </tr>
    </table>
    </section>
+   <dialog id="uploadDialog">
+      <form method="dialog">
+          <h2>Please select an archive file to upload</h2>
+          <input type="file" id="fileInput" accept=".tgz">
+          <menu>
+          <button value="cancel">Cancel</button>
+          <button value="submit">Upload</button>
+          </menu>
+      </form>
+   </dialog>
    </article>
    </main>
 </body>

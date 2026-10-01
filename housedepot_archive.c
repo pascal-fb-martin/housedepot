@@ -254,6 +254,74 @@ static const char *housedepot_archive_delete (const char *action,
     return housedepot_archive_list (action, uri, data, length);
 }
 
+static int housedepot_archive_file (const char *name) {
+
+    // Never accept to create a file based on a client-provided path.
+    const char *basename = strrchr (name, '/');
+    if (basename) basename += 1;
+    else          basename = name;
+
+    char path[256];
+    snprintf (path, sizeof(path), "%s/%s", DepotCache, basename);
+
+    int fd = open (path, O_CREAT+O_WRONLY, 0644);
+    if (fd < 0) echttp_error (500, "Failed to open the local archive");
+    else housestate_changed (DepotLive); // Because an archive was created
+
+    return fd;
+}
+
+static const char *housedepot_archive_upload (const char *action,
+                                              const char *uri,
+                                              const char *data, int length) {
+
+    if (length <= 0) return ""; // Nothing to upload, or it was asynchronous.
+
+    const char *name = echttp_parameter_get ("name");
+    if (!name) return "";
+
+    int fd = housedepot_archive_file (name);
+    if (fd < 0) return "";
+
+    if (write (fd, data, length) < 0)
+        echttp_error (500, "Failed to write to the local archive");
+
+    close (fd);
+    houselog_event ("ARCHIVE", name, "UPLOADED", "synchronously");
+
+    return "";
+}
+
+static const char *housedepot_archive_ready (const char *action,
+                                             const char *uri,
+                                             const char *data, int length) {
+
+    const char *name = echttp_parameter_get ("name");
+    if (!name) return 0;
+
+    const char *ascii = echttp_attribute_get ("Content-Length");
+    if (!ascii) return 0;
+
+    int fd = housedepot_archive_file (name);
+    if (fd < 0) return 0;
+
+    if (length > 0) {
+        if (write (fd, data, length) < 0) {
+            echttp_error (500, "Failed to write to the local archive");
+            return 0;
+        }
+    }
+
+    int total = atoi (ascii);
+    if (total > length) {
+        echttp_transfer (fd, total - length);
+    } else {
+        close (fd);
+    }
+    houselog_event ("ARCHIVE", name, "UPLOADED", "asynchronously");
+    return 0;
+}
+
 void housedepot_archive_initialize (const char *hostname,
                                     const char *root, int state) {
 
@@ -267,6 +335,10 @@ void housedepot_archive_initialize (const char *hostname,
         echttp_route_uri ("/depot/restore", housedepot_archive_restore);
         echttp_route_uri ("/depot/archive/all", housedepot_archive_list);
         echttp_route_uri ("/depot/archive/delete", housedepot_archive_delete);
+
+        echttp_asynchronous_route (echttp_route_uri ("/depot/archive/upload",
+                                                     housedepot_archive_upload),
+                                   housedepot_archive_ready);
         Initialized = 1;
     }
 }
