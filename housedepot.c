@@ -57,55 +57,6 @@ int housedepot_isdebug (void) {
     return Debug;
 }
 
-static const char *depot_backup (const char *action,
-                                 const char *uri,
-                                 const char *data, int length) {
-
-    const char *name = echttp_parameter_get ("name");
-
-    const char *error;
-    if (name) error = housedepot_archive_download (name);
-    else error = housedepot_archive_backup ();
-
-    if (error) echttp_error (500, error);
-    return "";
-}
-
-static const char *depot_restore (const char *action,
-                                  const char *uri,
-                                  const char *data, int length) {
-
-    const char *name = echttp_parameter_get ("name");
-    if (!name) {
-        echttp_error (500, "Missing archive name");
-    } else if (strsame (action, "GET")) {
-        const char *error = housedepot_archive_restore (name);
-        if (!error) {
-            housedepot_repository_reload (DepotRoot);
-            housedepot_revision_reload ();
-        } else {
-            echttp_error (500, error);
-        }
-    } else {
-        echttp_error (400, "Invalid method");
-    }
-    return "";
-}
-
-static const char *depot_archive_all (const char *action,
-                                      const char *uri,
-                                      const char *data, int length) {
-
-    return housedepot_archive_list ();
-}
-
-static const char *depot_archive_delete (const char *action,
-                                         const char *uri,
-                                         const char *data, int length) {
-
-    return housedepot_archive_delete (echttp_parameter_get ("name"));
-}
-
 static void housedepot_background (int fd, int mode) {
 
     static time_t LastCall = 0;
@@ -157,15 +108,11 @@ int main (int argc, const char **argv) {
     }
     int state = housedepot_revision_initialize
                     (houselog_host(), houseportal_server(), argc, argv);
+
     housedepot_repository_initialize
        (houselog_host(), houseportal_server(), DepotRoot, state);
 
     housedepot_archive_initialize (houselog_host(), DepotRoot, state);
-
-    echttp_route_uri ("/depot/backup", depot_backup);
-    echttp_route_uri ("/depot/restore", depot_restore);
-    echttp_route_uri ("/depot/archive/all", depot_archive_all);
-    echttp_route_uri ("/depot/archive/delete", depot_archive_delete);
 
     echttp_static_route ("/", "/usr/local/share/house/public");
     echttp_background (&housedepot_background);

@@ -21,37 +21,10 @@
  *
  * housedepot_archive.c: a module to manage archive backup and restore.
  *
- * const char *housedepot_archive_download (const char *name);
- *
- *    Download an existing archive.
- *
- * const char *housedepot_archive_backup (void);
- *
- *    Download the latest archive. A new archive is created if necessary
- *    (i.e. if the state of the repositories has changed since the most
- *    recent backup).
- *
- * const char *housedepot_archive_restore (const char *name);
- *
- *    Restore the specified archive. The existing data is archived (if
- *    necessary) and then wipped out. The archive file must be present in
- *    the depot archive cache.
- *
- *    Return 0 on success, an error string on failure.
- *
- * const char *housedepot_archive_delete (const char *name);
- *
- *    Delete the specified file and return the updated list of archives.
- *
- * const char *housedepot_archive_list (void);
- *
- *    List existing archives as a JSON object. May return an empty string
- *    if there was no update since the latest check, or on error.
- *
  * void housedepot_archive_initialize (const char *hostname,
  *                                     const char *root, int state);
  *
- *    Set the host name and initialize the module's resources.
+ *    Set the host name and paths, create the HTTP endpoints for this module.
  */
 
 #include <unistd.h>
@@ -71,6 +44,8 @@
 #include "houselog.h"
 
 #include "housestate.h"
+#include "housedepot_revision.h"
+#include "housedepot_repository.h"
 #include "housedepot_archive.h"
 
 #define DEBUG if (housedepot_isdebug()) printf
@@ -127,30 +102,19 @@ static void housedepot_archive_save (void) {
     }
 }
 
-const char *housedepot_archive_backup (void) {
-    housedepot_archive_save ();
-    return housedepot_archive_download (0);
-}
-
-const char *housedepot_archive_restore (const char *name) {
-
-    housedepot_archive_save ();
+static const char *housedepot_archive_extract (const char *name) {
 
     char command[512];
-    snprintf (command, sizeof(command),
-              "/usr/bin/rm -rf %s/*", DepotRoot);
+    snprintf (command, sizeof(command), "/usr/bin/rm -rf %s/*", DepotRoot);
     system (command);
 
     snprintf (command, sizeof(command),
               "/usr/bin/tar xf %s/%s -C %s", DepotCache, name, DepotRoot);
-    int status = system (command);
-    if (status) return "Archive extraction failed";
-
-    houselog_event ("ARCHIVE", name, "RESTORED", "");
+    if (system (command)) return "Archive extraction failed";
     return 0;
 }
 
-const char *housedepot_archive_download (const char *name) {
+static const char *housedepot_archive_download (const char *name) {
 
     int fd;
     if (name) {
@@ -180,22 +144,46 @@ const char *housedepot_archive_download (const char *name) {
     return 0;
 }
 
-const char *housedepot_archive_delete (const char *name) {
+static const char *housedepot_archive_restore (const char *action,
+                                               const char *uri,
+                                               const char *data, int length) {
 
-    if (!name) return "";
+    const char *name = echttp_parameter_get ("name");
+    if (!name) {
 
-    char path[256];
-    snprintf (path, sizeof(path), "%s/%s", DepotCache, name);
-    unlink (path);
-    houselog_event ("ARCHIVE", name, "DELETED", "");
+        echttp_error (500, "Missing archive name");
 
-    if (DepotLatestBackupFile[0]) {
-        const char *latest = housedepot_archive_base (DepotLatestBackupFile);
-        if (strsame (name, latest)) DepotLatestBackupFile[0] = 0;
+    } else if (strsame (action, "GET")) {
+
+        housedepot_archive_save (); // Protect the existing repository content
+
+        const char *error = housedepot_archive_extract (name);
+        if (error) {
+            echttp_error (500, error);
+            return "";
+        }
+
+        houselog_event ("ARCHIVE", name, "RESTORED", "");
+        housedepot_repository_reload (DepotRoot);
+        housedepot_revision_reload ();
+
+    } else {
+        echttp_error (400, "Invalid method");
     }
-    housestate_changed (DepotLive); // Because an archive was deleted.
+    return "";
+}
 
-    return housedepot_archive_list ();
+static const char *housedepot_archive_backup (const char *action,
+                                              const char *uri,
+                                              const char *data, int length) {
+
+    const char *name = echttp_parameter_get ("name");
+
+    if (!name) housedepot_archive_save ();
+    const char *error = housedepot_archive_download (name);
+
+    if (error) echttp_error (500, error);
+    return "";
 }
 
 static int housedepot_archive_filter (const struct dirent *e) {
@@ -206,7 +194,9 @@ static int housedepot_archive_filter (const struct dirent *e) {
     return 1;
 }
 
-const char *housedepot_archive_list (void) {
+static const char *housedepot_archive_list (const char *action,
+                                            const char *uri,
+                                            const char *data, int length) {
 
     if (housestate_same (DepotLive)) return "";
 
@@ -243,6 +233,27 @@ const char *housedepot_archive_list (void) {
     return buffer;
 }
 
+static const char *housedepot_archive_delete (const char *action,
+                                              const char *uri,
+                                              const char *data, int length) {
+
+    const char *name = echttp_parameter_get ("name");
+    if (!name) return "";
+
+    char path[256];
+    snprintf (path, sizeof(path), "%s/%s", DepotCache, name);
+    unlink (path);
+    houselog_event ("ARCHIVE", name, "DELETED", "");
+
+    if (DepotLatestBackupFile[0]) {
+        const char *latest = housedepot_archive_base (DepotLatestBackupFile);
+        if (strsame (name, latest)) DepotLatestBackupFile[0] = 0;
+    }
+    housestate_changed (DepotLive); // Because an archive was deleted.
+
+    return housedepot_archive_list (action, uri, data, length);
+}
+
 void housedepot_archive_initialize (const char *hostname,
                                     const char *root, int state) {
 
@@ -251,6 +262,11 @@ void housedepot_archive_initialize (const char *hostname,
         DepotHost = hostname;
         DepotRoot = root;
         DepotLive = state;
+
+        echttp_route_uri ("/depot/backup", housedepot_archive_backup);
+        echttp_route_uri ("/depot/restore", housedepot_archive_restore);
+        echttp_route_uri ("/depot/archive/all", housedepot_archive_list);
+        echttp_route_uri ("/depot/archive/delete", housedepot_archive_delete);
         Initialized = 1;
     }
 }
